@@ -717,59 +717,59 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
             
             {/* Header decoration */}
             <div className="flex items-center gap-2 mt-3">
-              <span className="px-3 py-1 rounded bg-[#55331C] text-[8.5px] uppercase font-bold text-amber-200 tracking-[0.2em] flex items-center gap-1.5 shadow-sm">
-                <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" /> UNIQUE SPECIALS
+              <span className="px-2.5 py-0.5 rounded bg-[#55331C] text-[8px] uppercase font-bold text-amber-200 tracking-[0.2em] flex items-center gap-1 shadow-sm">
+                <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" /> UNIQUE SPECIALS
               </span>
               <div className="h-[0.5px] bg-[#DFCBB3]/60 flex-1" />
             </div>
 
             {/* Horizontal Cards flow precisely stylized */}
             <div className="overflow-x-auto scrollbar-none -mx-4 px-4 pb-4">
-              <div className="flex gap-4.5 w-max py-1">
+              <div className="flex gap-3.5 w-max py-1">
                 {menuItems.filter(it => it.isSpecial).map((item) => (
                   <div
                     key={item.id}
-                    className="w-48 bg-white border border-[#EFE7D8] rounded-2xl overflow-hidden shadow-md flex flex-col hover:-translate-y-1 transition-all duration-300 group"
+                    className="w-40 bg-white border border-[#EFE7D8] rounded-xl overflow-hidden shadow-sm flex flex-col hover:-translate-y-1 transition-all duration-300 group"
                   >
                     {/* Badge top select */}
-                    <div className="px-3 py-2 flex justify-between items-center bg-gradient-to-r from-[#FAF6F0] to-[#FFFDF9] border-b border-[#F7EFE2]">
-                      <span className="px-2 py-0.5 text-[7.5px] rounded-md bg-amber-700/10 text-amber-900 border border-amber-700/20 font-bold tracking-wider capitalize">
+                    <div className="px-2 py-1.5 flex justify-between items-center bg-gradient-to-r from-[#FAF6F0] to-[#FFFDF9] border-b border-[#F7EFE2]">
+                      <span className="px-1.5 py-0.5 text-[7px] rounded bg-amber-700/10 text-amber-900 border border-amber-700/20 font-bold tracking-wider capitalize">
                         {item.tag || "BEST PICK"}
                       </span>
-                      <Sparkle className="w-3 h-3 text-amber-505" />
+                      <Sparkle className="w-2.5 h-2.5 text-amber-500" />
                     </div>
 
                     {/* Circular Image Container */}
-                    <div className="py-4 flex justify-center bg-gradient-to-b from-[#FFFDF9] to-transparent">
-                      <div className="w-24 h-24 rounded-full border-2 border-[#E9C35A] bg-white shadow-sm flex items-center justify-center p-1 relative transform transition-transform duration-300 group-hover:scale-105">
-                        <MenuImage itemId={item.id} category={item.category} className="w-20 h-20" image={item.image} />
+                    <div className="py-3 flex justify-center bg-gradient-to-b from-[#FFFDF9] to-transparent">
+                      <div className="w-20 h-20 rounded-full border border-[#E9C35A] bg-white shadow-xs flex items-center justify-center p-0.5 relative transform transition-transform duration-300 group-hover:scale-105">
+                        <MenuImage itemId={item.id} category={item.category} className="w-16 h-16" image={item.image} />
                       </div>
                     </div>
 
                     {/* Dark Brown Bottom layout with rich gold contrast */}
-                    <div className="p-4 bg-gradient-to-b from-[#3E2514] to-[#25140A] text-white flex-1 flex flex-col justify-between">
+                    <div className="p-3 bg-gradient-to-b from-[#3E2514] to-[#25140A] text-white flex-1 flex flex-col justify-between">
                       <div>
                         {/* English name with Jakarta brand standard */}
-                        <h4 className="text-[10px] font-sans font-bold tracking-wider uppercase text-amber-100 line-clamp-1">{item.nameEn}</h4>
+                        <h4 className="text-[9.5px] font-sans font-bold tracking-wider uppercase text-amber-100 line-clamp-1">{item.nameEn}</h4>
                         {/* Arabic name */}
-                        <div className="text-[11px] text-amber-300 font-serif font-bold mt-0.5 tracking-wide text-right">
+                        <div className="text-[10px] text-amber-300 font-serif font-bold mt-0.5 tracking-wide text-right">
                           {item.nameAr}
                         </div>
                         {/* Description */}
-                        <p className="text-[9px] text-[#CAB29E] font-sans mt-2.5 leading-snug line-clamp-2 h-7 overflow-hidden select-none">
+                        <p className="text-[8px] text-[#CAB29E] font-sans mt-2 leading-snug line-clamp-2 h-6 overflow-hidden select-none">
                           {item.descriptionEn}
                         </p>
                       </div>
 
                       {/* Pricing block with Add triggers */}
-                      <div className="mt-4 pt-3 border-t border-amber-800/50 flex items-center justify-between">
-                        <div className="text-xs font-mono font-bold text-amber-400">
+                      <div className="mt-3 pt-2.5 border-t border-amber-800/50 flex items-center justify-between">
+                        <div className="text-[10.5px] font-mono font-bold text-amber-400">
                           SR {item.price}
                         </div>
                         <button
                           type="button"
                           onClick={() => handleAddToCart(item)}
-                          className="px-3 py-1.5 bg-[#AC7F53] hover:bg-[#8F633B] active:scale-95 text-[9px] uppercase font-bold font-sans tracking-wide text-white rounded-lg transition shadow-xs"
+                          className="px-2.5 py-1 bg-[#AC7F53] hover:bg-[#8F633B] active:scale-95 text-[8.5px] uppercase font-bold font-sans tracking-wide text-white rounded-md transition shadow-xs"
                         >
                           + ADD
                         </button>
