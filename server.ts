@@ -235,7 +235,8 @@ const PORT = 3000;
 
   if (fs.existsSync(LOYALTY_FILE)) {
     try {
-      loyaltyProfiles = JSON.parse(fs.readFileSync(LOYALTY_FILE, "utf8"));
+      const parsed = JSON.parse(fs.readFileSync(LOYALTY_FILE, "utf8"));
+      loyaltyProfiles = Array.isArray(parsed) ? parsed.filter((p: any) => p.identifier !== "_settings_") : [];
     } catch (e) {
       console.error("Failed reading loyalty.json database storage file");
     }
@@ -266,6 +267,8 @@ const PORT = 3000;
       console.error("Failed creating initial empty loyalty_settings.json");
     }
   }
+
+  loadAllSettingsFromSupabase().catch(e => console.error("Error doing initial load of settings from Supabase:", e));
 
   async function saveLoyaltyAndSync(profile?: LoyaltyProfile) {
     try {
@@ -474,13 +477,15 @@ const PORT = 3000;
         const { data, error } = await supabase.from("loyalty").select("*");
         if (error) throw error;
         if (data) {
-          const fetched = data.map((d: any) => ({
-            identifier: d.identifier,
-            streak: Number(d.streak || 0),
-            lastDate: d.last_date || "",
-            history: typeof d.history === "string" ? JSON.parse(d.history) : (d.history || []),
-            rewardAvailable: !!d.reward_available
-          }));
+          const fetched = data
+            .filter((d: any) => d.identifier !== "_settings_")
+            .map((d: any) => ({
+              identifier: d.identifier,
+              streak: Number(d.streak || 0),
+              lastDate: d.last_date || "",
+              history: typeof d.history === "string" ? JSON.parse(d.history) : (d.history || []),
+              rewardAvailable: !!d.reward_available
+            }));
           loyaltyProfiles = fetched;
           safeWriteFileSync(LOYALTY_FILE, JSON.stringify(loyaltyProfiles, null, 2));
           return loyaltyProfiles;
@@ -490,6 +495,57 @@ const PORT = 3000;
       }
     }
     return loyaltyProfiles;
+  }
+
+  async function loadAllSettingsFromSupabase() {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from("loyalty").select("*").eq("identifier", "_settings_").maybeSingle();
+        if (error) throw error;
+        if (data) {
+          const config = typeof data.history === "string" ? JSON.parse(data.history) : (data.history || {});
+          if (config) {
+            if (config.freeProducts && Array.isArray(config.freeProducts)) {
+              loyaltySettings.freeProducts = config.freeProducts;
+              safeWriteFileSync(LOYALTY_SETTINGS_FILE, JSON.stringify(loyaltySettings, null, 2));
+              console.log("✓ Loaded freeProducts from Supabase settings:", loyaltySettings.freeProducts);
+            }
+            if (config.superAdminPin && typeof config.superAdminPin === "string") {
+              superAdminPin = config.superAdminPin;
+              safeWriteFileSync(ADMIN_PIN_FILE, JSON.stringify({ superAdminPin }, null, 2));
+              console.log("✓ Loaded superAdminPin from Supabase settings:", superAdminPin);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error("Failed querying all settings from Supabase '_settings_' record:", err.message);
+      }
+    }
+  }
+
+  async function syncAllSettingsToSupabase() {
+    if (supabase) {
+      try {
+        const configPayload = {
+          freeProducts: loyaltySettings.freeProducts,
+          superAdminPin: superAdminPin
+        };
+        const { error } = await supabase.from("loyalty").upsert({
+          identifier: "_settings_",
+          streak: 0,
+          last_date: "_config_",
+          history: configPayload,
+          reward_available: false
+        });
+        if (error) {
+          console.error("✕ Failed syncing all settings to Supabase:", error.message);
+        } else {
+          console.log("✓ Synced all settings to Supabase:", configPayload);
+        }
+      } catch (err: any) {
+        console.error("✕ Error syncing all settings to Supabase:", err.message);
+      }
+    }
   }
 
   async function syncLoyaltyToSupabase(lp: any) {
@@ -640,6 +696,7 @@ const PORT = 3000;
 
   // Authentication Pin Login
   app.post("/api/auth/login", async (req, res) => {
+    await loadAllSettingsFromSupabase();
     const { pin, email } = req.body;
 
     // Email-based Super Admin login bypass
@@ -691,11 +748,12 @@ const PORT = 3000;
   });
 
   // Get and Update Super Admin Pin endpoints
-  app.get("/api/auth/super-admin-pin", (req, res) => {
+  app.get("/api/auth/super-admin-pin", async (req, res) => {
+    await loadAllSettingsFromSupabase();
     res.json({ superAdminPin });
   });
 
-  app.post("/api/auth/super-admin-pin", (req, res) => {
+  app.post("/api/auth/super-admin-pin", async (req, res) => {
     const { pin } = req.body;
     if (!pin || pin.length !== 4 || !/^\d+$/.test(pin)) {
       return res.status(400).json({ error: "PIN must be exactly 4 digits! (Numeric only)" });
@@ -703,6 +761,7 @@ const PORT = 3000;
     superAdminPin = pin;
     try {
       safeWriteFileSync(ADMIN_PIN_FILE, JSON.stringify({ superAdminPin }, null, 2));
+      await syncAllSettingsToSupabase();
       res.json({ success: true, message: "Super Admin PIN updated successfully!" });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to persist Super Admin PIN: " + err.message });
@@ -791,11 +850,12 @@ const PORT = 3000;
   });
 
   // --- Loyalty selected products endpoints ---
-  app.get("/api/loyalty/settings", (req, res) => {
+  app.get("/api/loyalty/settings", async (req, res) => {
+    await loadAllSettingsFromSupabase();
     res.json(loyaltySettings);
   });
 
-  app.post("/api/loyalty/settings", (req, res) => {
+  app.post("/api/loyalty/settings", async (req, res) => {
     const { freeProducts } = req.body;
     if (!freeProducts || !Array.isArray(freeProducts)) {
       return res.status(400).json({ error: "Invalid freeProducts parameter" });
@@ -804,6 +864,7 @@ const PORT = 3000;
     loyaltySettings.freeProducts = freeProducts.slice(0, 3);
     try {
       safeWriteFileSync(LOYALTY_SETTINGS_FILE, JSON.stringify(loyaltySettings, null, 2));
+      await syncAllSettingsToSupabase();
       res.json({ success: true, loyaltySettings });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to write loyalty settings: " + err.message });
