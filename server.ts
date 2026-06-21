@@ -148,11 +148,11 @@ const PORT = 3000;
 
   // Super Admin security PIN state (Defaults to "1997")
   const ADMIN_PIN_FILE = path.join(process.cwd(), "admin_pin.json");
-  let superAdminPin = "1997";
+  let superAdminPin = process.env.SUPER_ADMIN_PIN || "1997";
   if (fs.existsSync(ADMIN_PIN_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(ADMIN_PIN_FILE, "utf8"));
-      if (data && data.superAdminPin) {
+      if (data && data.superAdminPin && !process.env.SUPER_ADMIN_PIN) {
         superAdminPin = data.superAdminPin;
       }
     } catch (e) {
