@@ -81,7 +81,13 @@ const PORT = 3000;
 
   if (fs.existsSync(DB_CONFIG_FILE)) {
     try {
-      dbConfig = JSON.parse(fs.readFileSync(DB_CONFIG_FILE, "utf8"));
+      const savedConfig = JSON.parse(fs.readFileSync(DB_CONFIG_FILE, "utf8"));
+      if (savedConfig && savedConfig.supabaseUrl) {
+        dbConfig.supabaseUrl = savedConfig.supabaseUrl;
+      }
+      if (savedConfig && savedConfig.supabaseAnonKey) {
+        dbConfig.supabaseAnonKey = savedConfig.supabaseAnonKey;
+      }
     } catch (e) {
       console.error("Failed to read database.json settings");
     }

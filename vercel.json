@@ -11,7 +11,7 @@
     },
     {
       "source": "/((?!api|uploads).*)$",
-      "destination": "/"
+      "destination": "/index.html"
     }
   ]
 }
