@@ -1,0 +1,6 @@
+{
+  "name": "Iconic Coffee Digital Menu",
+  "description": "A premium dual-language digital menu for Iconic Coffee. Includes table-based mobile ordering, integrated real-time preparation countdown timer, custom-styled specials row, and a full administrative Google-Sheet styled manager with instant CSV logs download.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
