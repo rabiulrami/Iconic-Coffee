@@ -23,22 +23,30 @@ export default function App() {
   const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
 
   React.useEffect(() => {
-    const path = window.location.pathname.toLowerCase();
-    const hash = window.location.hash.toLowerCase();
-    if (
-      path === '/admin' || 
-      path === '/staff' || 
-      path === '/sales-person' || 
-      path === '/sales' ||
-      hash === '#admin'
-    ) {
-      setView('admin');
-      setShowPinGate(true);
+    try {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (
+        path === '/admin' || 
+        path === '/staff' || 
+        path === '/sales-person' || 
+        path === '/sales' ||
+        hash === '#admin'
+      ) {
+        setView('admin');
+        setShowPinGate(true);
+      }
+    } catch (e) {
+      console.warn("Location check failed or blocked in modern sandbox/iframe context:", e);
     }
   }, []);
 
   const handleBackToMenu = () => {
-    window.history.pushState({}, '', '/');
+    try {
+      window.history.pushState({}, '', '/');
+    } catch (e) {
+      console.warn("History pushState blocked in sandbox/iframe context:", e);
+    }
     setView('menu');
     setShowPinGate(false);
     setPinCode('');
@@ -68,13 +76,29 @@ export default function App() {
         setAdminEmail('');
         setAdminPasswordPin('');
       } else {
-        const errData = await response.json();
-        setEmailErrorMsg(errData.error || "Login fail. Please check email/PIN.");
+        let errText = "Login failed. Please check your admin credentials.";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errText = errData.error || errText;
+          } else {
+            const textHTML = await response.text();
+            if (textHTML.includes("Login failed on server")) {
+              errText = textHTML.substring(0, 200);
+            } else {
+              errText = `Server responded with HTTP ${response.status}: Failed to authenticate code.`;
+            }
+          }
+        } catch {
+          errText = `HTTP Error ${response.status}: Failed to authenticate with server.`;
+        }
+        setEmailErrorMsg(errText);
         setPinError(true);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setEmailErrorMsg("Connection error.");
+      setEmailErrorMsg(`Connection error: ${err.message || 'Server down or unreachable.'}`);
       setPinError(true);
     } finally {
       setIsVerifying(false);
@@ -84,6 +108,7 @@ export default function App() {
   const handleVerifyPIN = async (pin: string) => {
     setIsVerifying(true);
     setPinError(false);
+    setEmailErrorMsg(null);
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -97,11 +122,21 @@ export default function App() {
         setShowPinGate(false);
         setPinCode('');
       } else {
+        let errText = "Incorrect Security PIN Code";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errText = errData.error || errText;
+          }
+        } catch {}
+        setEmailErrorMsg(errText);
         setPinError(true);
         setPinCode('');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setEmailErrorMsg(`Connection error: ${err.message}`);
       setPinError(true);
       setPinCode('');
     } finally {
@@ -153,7 +188,11 @@ export default function App() {
               {/* Core responsive customer component */}
               <div className="flex-1 overflow-y-auto sm:pt-4">
                 <CustomerMenu onGoToAdmin={() => {
-                  window.history.pushState({}, '', '/admin');
+                  try {
+                    window.history.pushState({}, '', '/admin');
+                  } catch (e) {
+                    console.warn("History pushState blocked in sandbox/iframe context:", e);
+                  }
                   setView('admin');
                   setShowPinGate(true);
                 }} />

@@ -161,6 +161,10 @@ export default function AdminSheet({ currentUser, onBackToMenu }: AdminSheetProp
   const [dbStatusMsg, setDbStatusMsg] = useState('');
   const [sqlCopied, setSqlCopied] = useState(false);
 
+  // Non-blocking confirmation flags to prevent window.confirm/alert iframe block errors
+  const [confirmVoidIdentifier, setConfirmVoidIdentifier] = useState<string | null>(null);
+  const [confirmDeleteStaffId, setConfirmDeleteStaffId] = useState<string | null>(null);
+
   const supabaseSqlQuery = `-- 1. Create 'products' table
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
@@ -425,6 +429,19 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
     }
   };
 
+  // Load sheets/webhook settings helper
+  const fetchSheetsSettings = async () => {
+    try {
+      const res = await fetch('/api/settings/sheets');
+      if (res.ok) {
+        const data = await res.json();
+        setSheetWebhookUrl(data.url || '');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Save database settings
   const handleSaveDbSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -671,13 +688,18 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
     fetchOrders();
     fetchProducts();
     fetchDBSettings();
+    fetchSheetsSettings();
     fetchStaff();
     fetchLoyaltySettings();
     
     // Check path for default tab selection
-    const path = window.location.pathname.toLowerCase();
-    if (path === '/sales' || path === '/sales-person') {
-      setActiveAdminTab('reports');
+    try {
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/sales' || path === '/sales-person') {
+        setActiveAdminTab('reports');
+      }
+    } catch (e) {
+      console.warn("Location pathname read blocked in sandbox/iframe context:", e);
     }
   }, []);
 
@@ -1989,7 +2011,11 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                                 <button
                                   type="button"
                                   onClick={async () => {
-                                    if (confirm(`Manually void/claim reward code for ${profile.identifier}?`)) {
+                                    if (confirmVoidIdentifier !== profile.identifier) {
+                                      setConfirmVoidIdentifier(profile.identifier);
+                                      // Auto expire confirmation stage in 5 seconds
+                                      setTimeout(() => setConfirmVoidIdentifier(null), 5000);
+                                    } else {
                                       try {
                                         const r = await fetch('/api/loyalty/claim', {
                                           method: 'POST',
@@ -1997,18 +2023,24 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                                           body: JSON.stringify({ identifier: profile.identifier })
                                         });
                                         if (r.ok) {
-                                          alert("Coupon marked clean successfully!");
+                                          showToast("✓ Coupon code successfully claimed and cleared!", "success");
+                                          setConfirmVoidIdentifier(null);
                                           fetchLoyaltyProfiles();
                                         }
                                       } catch (e) {
                                         console.error(e);
+                                        showToast("An error occurred clearing reward.", "error");
                                       }
                                     }
                                   }}
                                   disabled={!profile.rewardAvailable}
-                                  className="px-2.5 py-1 bg-red-950 hover:bg-red-900 disabled:opacity-40 text-red-300 border border-red-500/10 rounded text-[10.5px] cursor-pointer transition"
+                                  className={`px-2.5 py-1 disabled:opacity-40 rounded text-[10.5px] cursor-pointer transition font-mono border ${
+                                    confirmVoidIdentifier === profile.identifier
+                                      ? "bg-amber-650 hover:bg-amber-600 text-white border-amber-500 animate-pulse"
+                                      : "bg-red-950 hover:bg-red-900 text-red-300 border-red-500/10"
+                                  }`}
                                 >
-                                  Void Coupon Code
+                                  {confirmVoidIdentifier === profile.identifier ? "⚠️ Confirm Void?" : "Void Coupon Code"}
                                 </button>
                               </td>
                             </tr>
@@ -2194,14 +2226,26 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm(`Do you want to delete the staff account for ${st.name}?`)) {
+                            if (confirmDeleteStaffId !== st.id) {
+                              setConfirmDeleteStaffId(st.id);
+                              setTimeout(() => setConfirmDeleteStaffId(null), 5000);
+                            } else {
                               handleDeleteStaff(st.id);
+                              setConfirmDeleteStaffId(null);
                             }
                           }}
-                          className="p-1.5 bg-red-950/45 hover:bg-red-900 border border-red-900/25 text-red-400 hover:text-white rounded transition cursor-pointer"
-                          title="Revoke and Delete Access"
+                          className={`p-1.5 border transition cursor-pointer rounded flex items-center justify-center ${
+                            confirmDeleteStaffId === st.id
+                              ? "bg-amber-600 border-amber-500 text-white animate-pulse"
+                              : "bg-red-950/45 hover:bg-red-900 border-red-900/25 text-red-400 hover:text-white"
+                          }`}
+                          title={confirmDeleteStaffId === st.id ? "Tap again to double confirm deletion" : "Revoke and Delete Access"}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          {confirmDeleteStaffId === st.id ? (
+                            <span className="text-[10px] font-bold font-mono px-1">confirm?</span>
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
                         </button>
                       </div>
                     </div>

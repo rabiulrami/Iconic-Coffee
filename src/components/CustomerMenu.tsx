@@ -15,6 +15,7 @@ import {
   Check, 
   Timer, 
   ShieldCheck, 
+  Shield,
   AlertCircle, 
   ArrowRight,
   Sparkle,
@@ -38,6 +39,21 @@ interface CartItem extends MenuItem {
 export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   // Menu items dynamic state loaded from server live database
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
+
+  // Custom visual toast state for iframe safety (replacing window.alert)
+  const [toastText, setToastText] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('error');
+  const [toastTimeout, setToastTimeout] = useState<any>(null);
+
+  const triggerToast = (text: string, type: 'success' | 'error' = 'error') => {
+    setToastText(text);
+    setToastType(type);
+    if (toastTimeout) clearTimeout(toastTimeout);
+    const to = setTimeout(() => {
+      setToastText(null);
+    }, 4500);
+    setToastTimeout(to);
+  };
 
   // Category state
   const [activeCategory, setActiveCategory] = useState('specials');
@@ -263,7 +279,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   const handleClaimFreeLoyaltyProduct = (item: MenuItem) => {
     const hasFreeItem = cart.some(ci => ci.isLoyaltyFree);
     if (hasFreeItem) {
-      alert("You can only claim 1 free Loyalty Reward product per order!");
+      triggerToast("You can only claim 1 free Loyalty Reward product per order!", "error");
       return;
     }
 
@@ -289,7 +305,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     const target = cart.find(ci => ci.id === itemId);
     if (!target) return;
     if (target.isLoyaltyFree && delta > 0) {
-      alert("You can only claim 1 unit of your Free Loyalty Gift!");
+      triggerToast("You can only claim 1 unit of your Free Loyalty Gift!", "error");
       return;
     }
     const nextAmount = target.quantity + delta;
@@ -320,12 +336,12 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName.trim() || !tableNumber) {
-      alert('Please fill out your Name and select a Table Number!');
+      triggerToast('Please fill out your Name and select a Table Number!', "error");
       return;
     }
 
     if (redeemReward && redeemType === 'free_item' && maxLoyaltyItemPrice === 0) {
-      alert("Please add at least one of your 3 Exclusive VIP Loyalty Gifts to your cart to claim your Free Product reward!");
+      triggerToast("Please add at least one of your 3 Exclusive VIP Loyalty Gifts to your cart to claim your Free Product reward!", "error");
       return;
     }
 
@@ -370,7 +386,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
       setIsCartOpen(false);
       setIsTrackingOpen(true);
     } catch (err: any) {
-      alert(err.message || 'Server offline. Try re-sending order.');
+      triggerToast(err.message || 'Server offline. Try re-sending order.', "error");
     } finally {
       setIsCheckoutLoading(false);
     }
@@ -378,7 +394,11 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
   // Dismiss tracking overlay
   const handleDismissTracking = () => {
-    localStorage.removeItem('iconic_active_order_id');
+    try {
+      localStorage.removeItem('iconic_active_order_id');
+    } catch (e) {
+      console.warn("localStorage.removeItem blocked in sandbox/iframe context:", e);
+    }
     setActiveOrderId(null);
     setIsTrackingOpen(false);
   };
@@ -412,10 +432,37 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   return (
     <div className="min-h-screen bg-[#FAF6F0] text-[#3D2312] flex flex-col antialiased relative">
       
+      {/* Premium Floating non-blocking Toast notification */}
+      {toastText && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-[90%] max-w-sm shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)] bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-amber-900/10 flex items-start gap-3.5 transition-all animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className={`p-1.5 rounded-lg ${toastType === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+            <AlertCircle className="w-5 h-5 shrink-0" />
+          </div>
+          <div className="flex-1">
+            <h5 className="text-[10px] font-mono uppercase tracking-wider font-bold text-slate-500">
+              {toastType === 'success' ? 'Notification' : 'Notice / التنبيه'}
+            </h5>
+            <p className="text-xs font-semibold text-stone-800 leading-relaxed mt-0.5">{toastText}</p>
+          </div>
+          <button onClick={() => setToastText(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer text-sm font-bold">✕</button>
+        </div>
+      )}
+
       {/* Top App Header Badge Area */}
       <header className="bg-[#FFFDFC]/90 backdrop-blur-md border-b border-[#F3EAD9] px-4 py-4 flex flex-col items-center justify-center sticky top-0 z-40 shadow-sm relative">
         {/* Subtle Luxury Top Gold Border Line */}
         <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-200 via-amber-500 to-amber-200" />
+
+        {/* Staff Portal Shortcut button to avoid having to use # in URL */}
+        <button
+          type="button"
+          onClick={onGoToAdmin}
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 p-2 rounded-xl text-[#A28259] hover:text-[#9C5D30] hover:bg-amber-50/50 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center border border-transparent hover:border-amber-100"
+          title="Staff / Admin Portal Login"
+        >
+          <Shield className="w-4 h-4 text-[#9C5D30]" />
+          <span className="text-[8px] font-bold uppercase tracking-widest mt-0.5 text-[#8C765C]">Login</span>
+        </button>
 
         {/* Circular Gold Emblem with Luxury Framing */}
         <div className="w-13 h-13 rounded-full border border-[#D5C29D] flex items-center justify-center bg-white shadow-md mb-1 relative transform transition hover:scale-105 duration-300">

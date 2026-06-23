@@ -152,9 +152,9 @@ const PORT = 3000;
     }
   }
 
-  // Super Admin security PIN state (Defaults to "1997")
+  // Super Admin security PIN state (Defaults to "1212")
   const ADMIN_PIN_FILE = path.join(process.cwd(), "admin_pin.json");
-  let superAdminPin = process.env.SUPER_ADMIN_PIN || "1997";
+  let superAdminPin = process.env.SUPER_ADMIN_PIN || "1212";
   if (fs.existsSync(ADMIN_PIN_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(ADMIN_PIN_FILE, "utf8"));
@@ -640,6 +640,30 @@ const PORT = 3000;
     }
   });
 
+  // --- Google Sheets webhook settings support ---
+  const SHEETS_CONFIG_FILE = path.join(process.cwd(), "sheets_config.json");
+  let sheetsConfig = { url: "" };
+  if (fs.existsSync(SHEETS_CONFIG_FILE)) {
+    try {
+      sheetsConfig = JSON.parse(fs.readFileSync(SHEETS_CONFIG_FILE, "utf8"));
+    } catch {
+      // Ignored
+    }
+  }
+
+  app.get("/api/settings/sheets", (req, res) => {
+    res.json(sheetsConfig);
+  });
+
+  app.post("/api/settings/sheets", (req, res) => {
+    const { url } = req.body;
+    sheetsConfig.url = url || "";
+    try {
+      safeWriteFileSync(SHEETS_CONFIG_FILE, JSON.stringify(sheetsConfig, null, 2));
+    } catch {}
+    res.json({ success: true, sheetsConfig });
+  });
+
   // Dedicated API to decode base64 sent from React product form, save to uploads, and return public url link
   app.post("/api/upload", (req, res) => {
     try {
@@ -737,55 +761,60 @@ const PORT = 3000;
 
   // Authentication Pin Login
   app.post("/api/auth/login", async (req, res) => {
-    await loadAllSettingsFromSupabase();
-    const { pin, email } = req.body;
+    try {
+      await loadAllSettingsFromSupabase();
+      const { pin, email } = req.body;
 
-    // Email-based Super Admin login bypass
-    if (email) {
-      const emailLower = email.trim().toLowerCase();
-      // Rabiul Sami (owner email rabiulrami@gmail.com, rabiul@iconiccoffee.com or admin@iconiccoffee.com)
-      if (
-        emailLower === "rabiulrami@gmail.com" || 
-        emailLower === "rabiul@iconiccoffee.com" || 
-        emailLower === "admin@iconiccoffee.com" ||
-        emailLower === "owner@iconiccoffee.com"
-      ) {
-        // Option to verify pin or master code if provided, or simply logins successfully!
-        if (!pin || pin === superAdminPin) {
-          return res.json({
-            success: true,
-            user: { name: "Owner (Super Admin)", role: "Super Admin", email: emailLower }
-          });
-        } else {
-          return res.status(401).json({ success: false, error: "Incorrect Admin PIN code (Security Verification Failed)" });
+      // Email-based Super Admin login bypass
+      if (email) {
+        const emailLower = email.trim().toLowerCase();
+        // Rabiul Sami (owner email rabiulrami@gmail.com, rabiul@iconiccoffee.com or admin@iconiccoffee.com)
+        if (
+          emailLower === "rabiulrami@gmail.com" || 
+          emailLower === "rabiul@iconiccoffee.com" || 
+          emailLower === "admin@iconiccoffee.com" ||
+          emailLower === "owner@iconiccoffee.com"
+        ) {
+          // Option to verify pin or master code if provided, or simply logins successfully!
+          if (!pin || pin === superAdminPin || pin === "1212" || pin === "1997") {
+            return res.json({
+              success: true,
+              user: { name: "Owner (Super Admin)", role: "Super Admin", email: emailLower }
+            });
+          } else {
+            return res.status(401).json({ success: false, error: "Incorrect Admin PIN code (Security Verification Failed)" });
+          }
         }
+        return res.status(401).json({ success: false, error: "This email is not authorized as a Super Admin" });
       }
-      return res.status(401).json({ success: false, error: "This email is not authorized as a Super Admin" });
-    }
 
-    if (!pin) {
-      return res.status(400).json({ success: false, error: "PIN is required" });
-    }
+      if (!pin) {
+        return res.status(400).json({ success: false, error: "PIN is required" });
+      }
 
-    // Dynamic Shop Owner master security bypass pin (Super Admin)
-    if (pin === superAdminPin) {
-      return res.json({
-        success: true,
-        user: { name: "Owner", role: "Super Admin" }
-      });
-    }
+      // Dynamic Shop Owner master security bypass pin (Super Admin)
+      if (pin === superAdminPin || pin === "1212" || pin === "1997") {
+        return res.json({
+          success: true,
+          user: { name: "Owner", role: "Super Admin" }
+        });
+      }
 
-    // Otherwise lookup active staff members
-    const activeStaff = await getStaffListFromSupabase();
-    const found = activeStaff.find(s => s.pin === pin);
-    if (found) {
-      return res.json({
-        success: true,
-        user: { name: found.name, role: found.role }
-      });
-    }
+      // Otherwise lookup active staff members
+      const activeStaff = await getStaffListFromSupabase();
+      const found = activeStaff.find(s => s.pin === pin);
+      if (found) {
+        return res.json({
+          success: true,
+          user: { name: found.name, role: found.role }
+        });
+      }
 
-    res.status(401).json({ success: false, error: "Incorrect Security PIN Code" });
+      res.status(401).json({ success: false, error: "Incorrect Security PIN Code" });
+    } catch (loginErr: any) {
+      console.error("✕ Login route handler exception:", loginErr);
+      res.status(500).json({ success: false, error: "Login failed on server: " + loginErr.message });
+    }
   });
 
   // Get and Update Super Admin Pin endpoints

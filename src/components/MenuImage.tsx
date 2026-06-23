@@ -152,7 +152,7 @@ export default function MenuImage({ itemId, category, className = "w-16 h-16", i
           <div className="absolute w-[86%] h-[86%] rounded-full bg-white border border-slate-200/50 shadow flex items-center justify-center">
             {/* Cake Slice Wedge */}
             <div className="w-[66%] h-[66%] relative flex items-center justify-center overflow-hidden">
-              <div className="w-0 h-0 border-l-[22 px] border-l-transparent border-r-[22px] border-r-transparent border-b-[44px] border-b-[#fdfaf2] shadow-inner" />
+              <div className="w-0 h-0 border-l-[22px] border-l-transparent border-r-[22px] border-r-transparent border-b-[44px] border-b-[#fdfaf2] shadow-inner" />
               {/* Burnt basque layer */}
               <div className="absolute top-[32%] w-7 h-5 rounded-lg bg-[#422112] border-t border-amber-800 transform rotate-12 flex items-center justify-center">
                 <div className="w-4.5 h-1 bg-[#fff]/10 rounded-full" />
