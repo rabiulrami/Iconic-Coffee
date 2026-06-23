@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Sparkles, 
   CakeSlice, 
@@ -126,6 +126,18 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
   // Selected loyalty reward products (up to 3)
   const [loyaltyRewardProductIds, setLoyaltyRewardProductIds] = useState<string[]>([]);
+
+  // Highly robust derived VIP loyalty rewards product ID list
+  const actualRewardProductIds = useMemo(() => {
+    const validIds = loyaltyRewardProductIds.filter(id => menuItems.some(p => p.id === id));
+    if (validIds.length > 0) return validIds.slice(0, 3);
+    
+    // Fallback: If no loyaltyRewardProductIds match existing products (or database settings not synchronized yet),
+    // we use the first 3 specials, or first 3 overall items so that the VIP Loyalty Gift shelf is always populated and active
+    const specials = menuItems.filter(p => p.category === 'specials');
+    if (specials.length >= 3) return specials.slice(0, 3).map(p => p.id);
+    return menuItems.slice(0, 3).map(p => p.id);
+  }, [loyaltyRewardProductIds, menuItems]);
 
   // Fetch active products
   useEffect(() => {
@@ -299,7 +311,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   const totalCartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalCartPriceSum = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const eligibleLoyaltyItemsInCart = cart.filter(c => loyaltyRewardProductIds.includes(c.id));
+  const eligibleLoyaltyItemsInCart = cart.filter(c => actualRewardProductIds.includes(c.id));
   const maxLoyaltyItemPrice = eligibleLoyaltyItemsInCart.length > 0 
     ? Math.max(...eligibleLoyaltyItemsInCart.map(c => c.price)) 
     : 0;
@@ -553,7 +565,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
         </div>
 
         {/* --- EXCLUSIVE LOYALTY REWARDS SELECTION --- */}
-        {menuItems && loyaltyRewardProductIds && loyaltyRewardProductIds.length > 0 && (
+        {menuItems && actualRewardProductIds && actualRewardProductIds.length > 0 && (
           <div className="w-full bg-[#FAF6F0] rounded-2.5xl p-5 border border-[#E9DFCE] text-[#3D2312] space-y-4 animate-fadeIn shadow-xs">
             <div className="flex justify-between items-start gap-4">
               <div>
@@ -571,7 +583,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              {loyaltyRewardProductIds
+              {actualRewardProductIds
                 .map((id) => menuItems.find((p) => p.id === id))
                 .filter((prod): prod is MenuItem => !!prod)
                 .slice(0, 3)
@@ -684,9 +696,9 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           )}
         </div>
 
-        {/* Horizontal Category Slider Track */}
-        <div className="overflow-x-auto scrollbar-none pb-2.5 -mx-4 px-4 sticky top-[134px] sm:top-[148px] z-30 bg-[#FAF6F0]/90 backdrop-blur-md shadow-sm border-y border-[#F3EAD9]/50">
-          <div className="flex gap-2.5 whitespace-nowrap py-1.5 matches-scrollbar">
+        {/* Categories Grid Wrap - 2 to 3 lines */}
+        <div className="pb-3 px-4 sticky top-[134px] sm:top-[148px] z-30 bg-[#FAF6F0]/95 backdrop-blur-md shadow-sm border-y border-[#F3EAD9]/50 -mx-4">
+          <div className="flex flex-wrap gap-2 justify-center py-2">
             {CATEGORIES.map((cat) => {
               const active = activeCategory === cat.id;
               return (
@@ -696,10 +708,10 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   onClick={() => {
                     setActiveCategory(cat.id);
                   }}
-                  className={`px-5 py-2 rounded-xl text-xs font-semibold flex items-center shadow-xs transition-all duration-300 active:scale-95 border ${
+                  className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold flex items-center shadow-xs transition-all duration-300 active:scale-95 border ${
                     active
-                      ? 'bg-[#55331C] text-amber-200 border-[#947752] scale-[1.02] font-semibold'
-                      : 'bg-white/80 hover:bg-[#FBF7F0] text-[#7A6351] border-[#E9DFCE] hover:text-[#55331C]'
+                      ? 'bg-[#55331C] text-amber-200 border-[#947752] scale-[1.01] font-semibold'
+                      : 'bg-white/95 hover:bg-[#FBF7F0] text-[#7A6351] border-[#E9DFCE] hover:text-[#55331C]'
                   }`}
                 >
                   {renderCatIcon(cat.icon)}
@@ -1145,7 +1157,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                               🎁 Add 1 of your 3 Exclusive Free Gifts:
                             </p>
                             <div className="grid grid-cols-1 gap-2">
-                              {loyaltyRewardProductIds
+                              {actualRewardProductIds
                                 .map((id) => menuItems.find((p) => p.id === id))
                                 .filter((prod): prod is MenuItem => !!prod)
                                 .slice(0, 3)

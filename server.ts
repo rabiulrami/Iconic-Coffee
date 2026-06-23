@@ -322,8 +322,15 @@ const PORT = 3000;
   async function getProductsListFromSupabase() {
     if (supabase) {
       try {
-        const { data, error } = await supabase.from("products").select("*").order("id");
-        if (error) throw error;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Supabase products query timed out")), 1500)
+        );
+        const queryPromise = (async () => {
+          const { data, error } = await supabase.from("products").select("*").order("id");
+          if (error) throw error;
+          return data;
+        })();
+        const data = await Promise.race([queryPromise, timeoutPromise]);
         if (data && data.length > 0) {
           const fetched = data.map((d: any) => ({
             id: d.id,
@@ -382,8 +389,15 @@ const PORT = 3000;
   async function getOrdersListFromSupabase() {
     if (supabase) {
       try {
-        const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
-        if (error) throw error;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Supabase orders query timed out")), 1500)
+        );
+        const queryPromise = (async () => {
+          const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+          if (error) throw error;
+          return data;
+        })();
+        const data = await Promise.race([queryPromise, timeoutPromise]);
         if (data) {
           const parsedOrders = data.map((d: any) => ({
             id: d.id,
@@ -431,8 +445,15 @@ const PORT = 3000;
   async function getStaffListFromSupabase() {
     if (supabase) {
       try {
-        const { data, error } = await supabase.from("staff").select("*").order("created_at", { ascending: true });
-        if (error) throw error;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Supabase staff query timed out")), 1500)
+        );
+        const queryPromise = (async () => {
+          const { data, error } = await supabase.from("staff").select("*").order("created_at", { ascending: true });
+          if (error) throw error;
+          return data;
+        })();
+        const data = await Promise.race([queryPromise, timeoutPromise]);
         if (data && data.length > 0) {
           const fetchedStaff = data.map((d: any) => ({
             id: d.id,
@@ -477,8 +498,15 @@ const PORT = 3000;
   async function getLoyaltyProfilesFromSupabase() {
     if (supabase) {
       try {
-        const { data, error } = await supabase.from("loyalty").select("*");
-        if (error) throw error;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Supabase loyalty profiles query timed out")), 1500)
+        );
+        const queryPromise = (async () => {
+          const { data, error } = await supabase.from("loyalty").select("*");
+          if (error) throw error;
+          return data;
+        })();
+        const data = await Promise.race([queryPromise, timeoutPromise]);
         if (data) {
           const fetched = data
             .filter((d: any) => d.identifier !== "_settings_")
@@ -503,8 +531,18 @@ const PORT = 3000;
   async function loadAllSettingsFromSupabase() {
     if (supabase) {
       try {
-        const { data, error } = await supabase.from("loyalty").select("*").eq("identifier", "_settings_").maybeSingle();
-        if (error) throw error;
+        // Enforce a maximum 1.5s timeout on security queries to prevent network locks during login/sync
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Supabase query timed out after 1.5 seconds")), 1500)
+        );
+
+        const queryPromise = (async () => {
+          const { data, error } = await supabase.from("loyalty").select("*").eq("identifier", "_settings_").maybeSingle();
+          if (error) throw error;
+          return data;
+        })();
+
+        const data = await Promise.race([queryPromise, timeoutPromise]);
         if (data) {
           const config = typeof data.history === "string" ? JSON.parse(data.history) : (data.history || {});
           if (config) {
@@ -521,7 +559,7 @@ const PORT = 3000;
           }
         }
       } catch (err: any) {
-        console.error("Failed querying all settings from Supabase '_settings_' record:", err.message);
+        console.error("Failed querying all settings from Supabase '_settings_' record (or timed out):", err.message);
       }
     }
   }
