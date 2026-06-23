@@ -3,7 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
-import { MENU_ITEMS } from "./src/data";
+import { MENU_ITEMS } from "./src/data.ts";
 
 function safeWriteFileSync(filePath: string, content: string | Buffer) {
   try {
@@ -97,7 +97,7 @@ const PORT = 3000;
   function initSupabase() {
     const url = dbConfig.supabaseUrl || process.env.SUPABASE_URL || "";
     const key = dbConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || "";
-    if (url && key) {
+    if (url && key && url.startsWith("https://")) {
       try {
         supabase = createClient(url, key);
         console.log(`✓ Supabase connected to: ${url}`);
@@ -251,12 +251,15 @@ const PORT = 3000;
   // --- Loyalty selected products settings ---
   const LOYALTY_SETTINGS_FILE = path.join(process.cwd(), "loyalty_settings.json");
   let loyaltySettings = {
-    freeProducts: [] as string[]
+    freeProducts: ["cold-10", "boba-3", "boba-11"] as string[]
   };
 
   if (fs.existsSync(LOYALTY_SETTINGS_FILE)) {
     try {
-      loyaltySettings = JSON.parse(fs.readFileSync(LOYALTY_SETTINGS_FILE, "utf8"));
+      const loaded = JSON.parse(fs.readFileSync(LOYALTY_SETTINGS_FILE, "utf8"));
+      if (loaded && Array.isArray(loaded.freeProducts) && loaded.freeProducts.length > 0) {
+        loyaltySettings = loaded;
+      }
     } catch (e) {
       console.error("Failed reading loyalty_settings.json");
     }

@@ -2259,6 +2259,26 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                 products menu modifications, page updates, and employees registers directory to your Supabase tables in real-time.
               </p>
 
+              <div className="mt-4 p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-slate-350 space-y-1">
+                <p className="font-bold text-amber-400 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider">
+                  ⚠️ Cloud Deployment & Vercel Notice
+                </p>
+                <p className="leading-relaxed">
+                  Because Vercel runs in a serverless, read-only container environment, any credentials saved here cannot write to <code className="text-amber-500 font-mono">database.json</code> permanently. 
+                  To keep Supabase connected permanently on Vercel, please set these two **Environment Variables** in your Vercel Dashboard:
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-2 font-mono text-[11px]">
+                  <div className="bg-slate-950 p-2 rounded border border-slate-850">
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider mb-0.5">Variable Name</span>
+                    <span className="text-amber-500 font-bold block">SUPABASE_URL</span>
+                  </div>
+                  <div className="bg-slate-950 p-2 rounded border border-slate-850">
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider mb-0.5">Variable Name</span>
+                    <span className="text-amber-500 font-bold block">SUPABASE_ANON_KEY</span>
+                  </div>
+                </div>
+              </div>
+
               <form onSubmit={handleSaveDbSettings} className="mt-5 space-y-4 max-w-xl">
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
