@@ -72,21 +72,30 @@ const PORT = 3000;
   app.use("/uploads", express.static(UPLOADS_DIR));
   app.use("/uploads", express.static(TMP_UPLOADS_DIR));
 
+  function cleanEnvValue(val: string | undefined): string {
+    if (!val) return "";
+    let s = val.trim();
+    if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+      s = s.slice(1, -1).trim();
+    }
+    return s;
+  }
+
   // Database Connection file or process environment variables
   const DB_CONFIG_FILE = path.join(process.cwd(), "database.json");
   let dbConfig = {
-    supabaseUrl: process.env.SUPABASE_URL || "",
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ""
+    supabaseUrl: cleanEnvValue(process.env.SUPABASE_URL),
+    supabaseAnonKey: cleanEnvValue(process.env.SUPABASE_ANON_KEY)
   };
 
   if (fs.existsSync(DB_CONFIG_FILE)) {
     try {
       const savedConfig = JSON.parse(fs.readFileSync(DB_CONFIG_FILE, "utf8"));
       if (savedConfig && savedConfig.supabaseUrl) {
-        dbConfig.supabaseUrl = savedConfig.supabaseUrl;
+        dbConfig.supabaseUrl = cleanEnvValue(savedConfig.supabaseUrl);
       }
       if (savedConfig && savedConfig.supabaseAnonKey) {
-        dbConfig.supabaseAnonKey = savedConfig.supabaseAnonKey;
+        dbConfig.supabaseAnonKey = cleanEnvValue(savedConfig.supabaseAnonKey);
       }
     } catch (e) {
       console.error("Failed to read database.json settings");
@@ -95,8 +104,8 @@ const PORT = 3000;
 
   let supabase: any = null;
   function initSupabase() {
-    const url = dbConfig.supabaseUrl || process.env.SUPABASE_URL || "";
-    const key = dbConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || "";
+    const url = cleanEnvValue(dbConfig.supabaseUrl || process.env.SUPABASE_URL);
+    const key = cleanEnvValue(dbConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY);
     if (url && key && url.startsWith("https://")) {
       try {
         supabase = createClient(url, key);
@@ -154,12 +163,12 @@ const PORT = 3000;
 
   // Super Admin security PIN state (Defaults to "1212")
   const ADMIN_PIN_FILE = path.join(process.cwd(), "admin_pin.json");
-  let superAdminPin = process.env.SUPER_ADMIN_PIN || "1212";
+  let superAdminPin = cleanEnvValue(process.env.SUPER_ADMIN_PIN) || "1212";
   if (fs.existsSync(ADMIN_PIN_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(ADMIN_PIN_FILE, "utf8"));
       if (data && data.superAdminPin && !process.env.SUPER_ADMIN_PIN) {
-        superAdminPin = data.superAdminPin;
+        superAdminPin = cleanEnvValue(data.superAdminPin);
       }
     } catch (e) {
       console.error("Failed to read admin_pin.json");
@@ -323,7 +332,7 @@ const PORT = 3000;
     if (supabase) {
       try {
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Supabase products query timed out")), 1500)
+          setTimeout(() => reject(new Error("Supabase products query timed out")), 6000)
         );
         const queryPromise = (async () => {
           const { data, error } = await supabase.from("products").select("*").order("id");
@@ -390,7 +399,7 @@ const PORT = 3000;
     if (supabase) {
       try {
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Supabase orders query timed out")), 1500)
+          setTimeout(() => reject(new Error("Supabase orders query timed out")), 6000)
         );
         const queryPromise = (async () => {
           const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
@@ -446,7 +455,7 @@ const PORT = 3000;
     if (supabase) {
       try {
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Supabase staff query timed out")), 1500)
+          setTimeout(() => reject(new Error("Supabase staff query timed out")), 6000)
         );
         const queryPromise = (async () => {
           const { data, error } = await supabase.from("staff").select("*").order("created_at", { ascending: true });
@@ -499,7 +508,7 @@ const PORT = 3000;
     if (supabase) {
       try {
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Supabase loyalty profiles query timed out")), 1500)
+          setTimeout(() => reject(new Error("Supabase loyalty profiles query timed out")), 6000)
         );
         const queryPromise = (async () => {
           const { data, error } = await supabase.from("loyalty").select("*");
@@ -531,9 +540,9 @@ const PORT = 3000;
   async function loadAllSettingsFromSupabase() {
     if (supabase) {
       try {
-        // Enforce a maximum 1.5s timeout on security queries to prevent network locks during login/sync
+        // Enforce a maximum 6s timeout on security queries to prevent network locks during login/sync
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Supabase query timed out after 1.5 seconds")), 1500)
+          setTimeout(() => reject(new Error("Supabase query timed out after 6 seconds")), 6000)
         );
 
         const queryPromise = (async () => {
