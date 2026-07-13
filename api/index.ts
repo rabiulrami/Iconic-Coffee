@@ -14,7 +14,11 @@ import path from "path";
 // It is loaded lazily inside the development-only branch below instead.
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
-import { MENU_ITEMS } from "../src/data";
+// Explicit .js extension is REQUIRED: Vercel compiles this to native ESM, and
+// Node's ESM loader does not auto-resolve extensionless relative imports.
+// Without it the function crashes at load with ERR_MODULE_NOT_FOUND. Dev tools
+// (tsx/vite/esbuild) resolve the .js back to this .ts file transparently.
+import { MENU_ITEMS } from "../src/data.js";
 
 function safeWriteFileSync(filePath: string, content: string | Buffer) {
   try {
