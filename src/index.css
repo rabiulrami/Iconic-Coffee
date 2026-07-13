@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Warm heritage-coffee palette - one system, locked. */
+  --color-paper: #F4EEE4;      /* warm ivory base            */
+  --color-paper-2: #EDE4D5;    /* deeper ivory for insets    */
+  --color-card: #FDFAF5;       /* warm white raised surface  */
+  --color-ink: #241812;        /* espresso near-black (text) */
+  --color-espresso: #21150F;   /* dark "moment" surfaces     */
+  --color-muted: #6E5B4C;      /* secondary text on paper    */
+  --color-faint: #A08D7C;      /* tertiary / meta text       */
+  --color-line: #E5DAC7;       /* hairline on paper          */
+  --color-accent: #9A5A2C;     /* copper - the single accent */
+  --color-accent-deep: #7C451F;/* copper pressed / hover     */
+  --color-cream: #F2E9DA;      /* text/ivory on dark surface */
+  --color-cream-muted: #C4B3A0;/* muted text on dark surface */
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+  }
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+    color: var(--color-espresso);
+  }
+}
+
+/* Warm, tinted soft shadow - never pure-black drop shadows. */
+.shadow-soft {
+  box-shadow: 0 1px 2px rgba(50, 33, 22, 0.04),
+    0 12px 30px -14px rgba(50, 33, 22, 0.22);
+}
+.shadow-lift {
+  box-shadow: 0 2px 4px rgba(50, 33, 22, 0.05),
+    0 22px 48px -18px rgba(50, 33, 22, 0.30);
+}
+
+/* Hide scrollbar on horizontal rails */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Restrained, purposeful motion. All of it collapses under reduced-motion. */
+@keyframes ic-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ic-slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ic-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+@keyframes ic-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.animate-fadeIn { animation: ic-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slideUp { animation: ic-slide-up 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-shake { animation: ic-shake 0.4s ease-in-out both; }
+.animate-livedot { animation: ic-pulse-dot 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn,
+  .animate-slideUp,
+  .animate-shake,
+  .animate-livedot {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}

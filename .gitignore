@@ -1,0 +1,18 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Local-mode runtime data (regenerated at startup; the source of truth is Supabase)
+products.json
+staff.json
+orders.json
+loyalty.json
+admin_pin.json
+database.json
+sheets_config.json
+uploads/
