@@ -8,7 +8,10 @@ dotenv.config();
 
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+// NOTE: Vite is a dev-only tool and must NOT be imported at the top level.
+// On serverless hosts (Vercel) this file is loaded as a function; a static
+// `import "vite"` would execute at cold start and crash every route with a 500.
+// It is loaded lazily inside the development-only branch below instead.
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import { MENU_ITEMS } from "../src/data";
@@ -1346,14 +1349,20 @@ const app = express();
   // Dynamic asset routing for dev/SPA fallback
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting server in DEVELOPMENT with Vite live compilation...");
-    createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    }).then((vite) => {
-      app.use(vite.middlewares);
-    }).catch((err) => {
-      console.error("Vite server middleware initialization error:", err);
-    });
+    // Lazy-load Vite only in development so it never enters the serverless bundle.
+    import("vite")
+      .then(({ createServer }) =>
+        createServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        })
+      )
+      .then((vite) => {
+        app.use(vite.middlewares);
+      })
+      .catch((err) => {
+        console.error("Vite server middleware initialization error:", err);
+      });
   } else {
     console.log("Starting server in PRODUCTION. Serving static artifacts directly...");
     const distPath = path.join(process.cwd(), "dist");
