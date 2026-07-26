@@ -521,24 +521,27 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     setIsTrackingOpen(false);
   };
 
-  // Branded category thumbnail. Falls back to the Supabase CDN copy, then to the
-  // matching Lucide glyph, so the rail never renders an empty box.
+  // Branded category tile art. Falls back to the Supabase CDN copy, then to the
+  // matching Lucide glyph, so a tile never renders empty.
   const renderCatIcon = (cat: Category) => {
-    const style = "w-4 h-4";
-    const glyph = () => {
-      switch (cat.icon) {
-        case 'Sparkles': return <Sparkles className={style} />;
-        case 'CakeSlice': return <CakeSlice className={style} />;
-        case 'Milk': return <Milk className={style} />;
-        case 'CupSoda': return <CupSoda className={style} />;
-        case 'IceCream': return <IceCream className={style} />;
-        case 'Citrus': return <Citrus className={style} />;
-        default: return <Coffee className={style} />;
-      }
-    };
-
     if (brokenCatImages.includes(cat.id)) {
-      return <span className="mr-1.5 flex items-center">{glyph()}</span>;
+      const style = "w-7 h-7 text-accent";
+      const glyph = () => {
+        switch (cat.icon) {
+          case 'Sparkles': return <Sparkles className={style} strokeWidth={1.5} />;
+          case 'CakeSlice': return <CakeSlice className={style} strokeWidth={1.5} />;
+          case 'Milk': return <Milk className={style} strokeWidth={1.5} />;
+          case 'CupSoda': return <CupSoda className={style} strokeWidth={1.5} />;
+          case 'IceCream': return <IceCream className={style} strokeWidth={1.5} />;
+          case 'Citrus': return <Citrus className={style} strokeWidth={1.5} />;
+          default: return <Coffee className={style} strokeWidth={1.5} />;
+        }
+      };
+      return (
+        <span className="w-full h-full bg-paper-2 flex items-center justify-center">
+          {glyph()}
+        </span>
+      );
     }
 
     return (
@@ -554,9 +557,17 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
             setBrokenCatImages((prev) => prev.includes(cat.id) ? prev : [...prev, cat.id]);
           }
         }}
-        className="w-[22px] h-[22px] rounded-full object-cover mr-2 shrink-0 ring-1 ring-black/8"
+        className="w-full h-full object-cover"
       />
     );
+  };
+
+  // Picking a category from the grid drops the customer straight onto the products
+  const handleSelectCategory = (categoryId: string) => {
+    setActiveCategory(categoryId);
+    requestAnimationFrame(() => {
+      listContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   // Filter items in real time based on active category tabs and search bars
@@ -833,30 +844,38 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           )}
         </div>
 
-        {/* Category rail */}
-        <div className="pb-2 px-4 sticky top-[150px] sm:top-[164px] z-30 bg-paper/95 backdrop-blur-md border-b border-line/60 -mx-4">
-          <div className="flex gap-2 overflow-x-auto scrollbar-none py-2.5">
-            {CATEGORIES.map((cat) => {
-              const active = activeCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveCategory(cat.id);
-                  }}
-                  className={`shrink-0 pl-1.5 pr-4 py-1.5 rounded-full text-[12px] font-medium flex items-center transition-all duration-200 active:scale-95 border ${
+        {/* Category grid — large branded tile, small label, whole menu visible at once */}
+        <div className="grid grid-cols-4 gap-x-2.5 gap-y-4 pt-1">
+          {CATEGORIES.map((cat) => {
+            const active = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => handleSelectCategory(cat.id)}
+                aria-pressed={active}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
+              >
+                <span
+                  className={`block w-full aspect-square rounded-2xl overflow-hidden bg-card transition-all duration-200 group-active:scale-95 ${
                     active
-                      ? 'bg-espresso text-cream border-espresso'
-                      : 'bg-card hover:bg-paper-2 text-muted border-line hover:text-ink'
+                      ? 'ring-2 ring-accent ring-offset-2 ring-offset-paper shadow-soft'
+                      : 'ring-1 ring-line group-hover:ring-accent/40'
                   }`}
                 >
                   {renderCatIcon(cat)}
-                  <span className="font-sans">{cat.nameEn}</span>
-                </button>
-              );
-            })}
-          </div>
+                </span>
+                {/* Fixed two-line box keeps every tile on the same baseline */}
+                <span
+                  className={`text-[11px] leading-[1.3] text-center font-sans h-[29px] px-0.5 transition-colors ${
+                    active ? 'text-ink font-semibold' : 'text-muted font-medium group-hover:text-ink'
+                  }`}
+                >
+                  {cat.nameEn}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* --- DAILY SPECIALS HEADER & ROW (IF ACTIVE AND VALID) --- */}
@@ -920,8 +939,8 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
         )}
 
         {/* --- PRIMARY GRID CAT FLOWS --- */}
-        <div className="space-y-6">
-          
+        <div className="space-y-6 scroll-mt-4" ref={listContainerRef}>
+
           {/* Dynamic Active Title */}
           <div className="flex items-baseline gap-2.5">
             <h3 className="text-[22px] font-serif font-semibold text-ink leading-none">
