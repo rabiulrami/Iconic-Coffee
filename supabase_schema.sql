@@ -32,9 +32,15 @@ CREATE TABLE IF NOT EXISTS staff (
 );
 
 -- 3. Orders (live customer orders)
+--    Destination is floor / gate / shop, not a table. `table_number` is kept as the
+--    pre-computed one-line label so orders placed before this change still resolve.
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
   customer_name TEXT,
+  floor TEXT,
+  gate TEXT,
+  shop_name TEXT,
+  signboard_url TEXT,
   table_number TEXT,
   phone_number TEXT,
   total_price NUMERIC,
@@ -44,6 +50,12 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   estimated_time_minutes INTEGER DEFAULT 10
 );
+
+-- Upgrade path for a project created before the floor/gate rollout.
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS floor TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS gate TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shop_name TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS signboard_url TEXT;
 
 -- 4. Loyalty (streak / rewards profiles + app settings row)
 CREATE TABLE IF NOT EXISTS loyalty (
@@ -77,3 +89,22 @@ CREATE POLICY "Allow all for anonymous users on orders" ON public.orders FOR ALL
 
 DROP POLICY IF EXISTS "Allow all for anonymous users on loyalty" ON public.loyalty;
 CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR ALL USING (true) WITH CHECK (true);
+
+-- ------------------------------------------------------------
+-- Storage: two PUBLIC buckets.
+--   signboards  - shop signboard photos customers attach to an order
+--   menu-assets - branded category / product imagery
+-- Create both under Storage -> Buckets (public = on), then run these policies
+-- so the anon key the server uses can upload into them.
+-- ------------------------------------------------------------
+DROP POLICY IF EXISTS "Public read signboards" ON storage.objects;
+CREATE POLICY "Public read signboards" ON storage.objects FOR SELECT USING (bucket_id = 'signboards');
+
+DROP POLICY IF EXISTS "Anon upload signboards" ON storage.objects;
+CREATE POLICY "Anon upload signboards" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'signboards');
+
+DROP POLICY IF EXISTS "Public read menu-assets" ON storage.objects;
+CREATE POLICY "Public read menu-assets" ON storage.objects FOR SELECT USING (bucket_id = 'menu-assets');
+
+DROP POLICY IF EXISTS "Anon upload menu-assets" ON storage.objects;
+CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'menu-assets');

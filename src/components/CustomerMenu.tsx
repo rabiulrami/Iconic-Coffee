@@ -23,9 +23,11 @@ import {
   XCircle,
   HelpCircle,
   Award,
-  Lock
+  Lock,
+  Store,
+  Camera
 } from 'lucide-react';
-import { CATEGORIES, MENU_ITEMS, MenuItem } from '../data';
+import { CATEGORIES, MENU_ITEMS, Category, MenuItem } from '../data';
 import MenuImage from './MenuImage';
 
 interface CustomerMenuProps {
@@ -59,13 +61,23 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   // Category state
   const [activeCategory, setActiveCategory] = useState('specials');
   const [searchQuery, setSearchQuery] = useState('');
+  // Category ids whose branded photo (and CDN fallback) failed to load
+  const [brokenCatImages, setBrokenCatImages] = useState<string[]>([]);
   
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [tableNumber, setTableNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+
+  // Delivery destination: floor -> (gate, 1st floor only) -> shop name -> signboard photo
+  const [floor, setFloor] = useState<'' | '1' | '2'>('');
+  const [gate, setGate] = useState('');
+  const [shopName, setShopName] = useState('');
+  const [signboardUrl, setSignboardUrl] = useState('');
+  const [signboardPreview, setSignboardPreview] = useState('');
+  const [isUploadingSignboard, setIsUploadingSignboard] = useState(false);
+  const signboardInputRef = useRef<HTMLInputElement>(null);
 
   // Loyalty coffee streak club states and check functions
   const [loyaltyInput, setLoyaltyInput] = useState('');
@@ -258,6 +270,19 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     return () => clearInterval(interval);
   }, [countdownSeconds]);
 
+  // Destination shown while tracking. Orders placed before the floor/gate rollout only
+  // carry the legacy `tableNumber` label, so fall back to it.
+  const describeDestination = (order: any) => {
+    if (!order) return '';
+    if (order.floor) {
+      const parts = [order.floor === '2' ? '2nd Floor' : '1st Floor'];
+      if (order.floor === '1' && order.gate) parts.push(`Gate ${order.gate}`);
+      if (order.shopName) parts.push(order.shopName);
+      return parts.join(' · ');
+    }
+    return order.tableNumber || '';
+  };
+
   // Format countdown clock nicely to MM:SS
   const formatCountdown = () => {
     const mins = Math.floor(countdownSeconds / 60);
@@ -333,11 +358,91 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     ? Math.max(...eligibleLoyaltyItemsInCart.map(c => c.price)) 
     : 0;
 
+  // Switching to the 2nd floor drops any gate picked on the 1st floor
+  const handleSelectFloor = (nextFloor: '1' | '2') => {
+    setFloor(nextFloor);
+    if (nextFloor === '2') setGate('');
+  };
+
+  // Read the signboard photo, show it immediately, and push it to storage
+  const handleSignboardChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      triggerToast('Please upload a photo of your shop signboard (image file).', 'error');
+      return;
+    }
+    // 8 MB matches the storage bucket limit; phone cameras can exceed it easily.
+    if (file.size > 8 * 1024 * 1024) {
+      triggerToast('That photo is larger than 8 MB. Please upload a smaller one.', 'error');
+      return;
+    }
+
+    setIsUploadingSignboard(true);
+    setSignboardUrl('');
+    try {
+      const base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read that photo.'));
+        reader.readAsDataURL(file);
+      });
+
+      setSignboardPreview(base64);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, base64, kind: 'signboard' })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed.');
+
+      setSignboardUrl(data.url);
+      triggerToast('Signboard photo uploaded.', 'success');
+    } catch (err: any) {
+      setSignboardPreview('');
+      triggerToast(err.message || 'Could not upload your signboard photo. Please try again.', 'error');
+    } finally {
+      setIsUploadingSignboard(false);
+      // Let the customer re-pick the same file after a failure
+      if (signboardInputRef.current) signboardInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveSignboard = () => {
+    setSignboardPreview('');
+    setSignboardUrl('');
+    if (signboardInputRef.current) signboardInputRef.current.value = '';
+  };
+
   // Place Order checkout click
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim() || !tableNumber) {
-      triggerToast('Please fill out your Name and select a Table Number!', "error");
+    if (!customerName.trim()) {
+      triggerToast('Please enter your name!', "error");
+      return;
+    }
+    if (!floor) {
+      triggerToast('Please select your floor.', "error");
+      return;
+    }
+    if (floor === '1' && !gate) {
+      triggerToast('Please select your gate (1 to 5).', "error");
+      return;
+    }
+    if (!shopName.trim()) {
+      triggerToast('Please enter your shop name.', "error");
+      return;
+    }
+    if (isUploadingSignboard) {
+      triggerToast('Your signboard photo is still uploading. One moment.', "error");
+      return;
+    }
+    if (!signboardUrl) {
+      triggerToast('Please upload a photo of your shop signboard.', "error");
       return;
     }
 
@@ -360,7 +465,10 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
       const payload = {
         customerName: customerName.trim(),
-        tableNumber,
+        floor,
+        gate: floor === '1' ? gate : '',
+        shopName: shopName.trim(),
+        signboardUrl,
         phoneNumber: phoneNumber.trim(),
         items: simplifiedItems,
         redeemReward: redeemReward,
@@ -404,19 +512,42 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     setIsTrackingOpen(false);
   };
 
-  // Match Lucide category icons precisely
-  const renderCatIcon = (iconName: string) => {
-    const style = "w-4 h-4 mr-1.5";
-    switch (iconName) {
-      case 'Sparkles': return <Sparkles className={style} />;
-      case 'CakeSlice': return <CakeSlice className={style} />;
-      case 'Milk': return <Milk className={style} />;
-      case 'CupSoda': return <CupSoda className={style} />;
-      case 'IceCream': return <IceCream className={style} />;
-      case 'Citrus': return <Citrus className={style} />;
-      case 'Coffee': return <Coffee className={style} />;
-      default: return <Coffee className={style} />;
+  // Branded category thumbnail. Falls back to the Supabase CDN copy, then to the
+  // matching Lucide glyph, so the rail never renders an empty box.
+  const renderCatIcon = (cat: Category) => {
+    const style = "w-4 h-4";
+    const glyph = () => {
+      switch (cat.icon) {
+        case 'Sparkles': return <Sparkles className={style} />;
+        case 'CakeSlice': return <CakeSlice className={style} />;
+        case 'Milk': return <Milk className={style} />;
+        case 'CupSoda': return <CupSoda className={style} />;
+        case 'IceCream': return <IceCream className={style} />;
+        case 'Citrus': return <Citrus className={style} />;
+        default: return <Coffee className={style} />;
+      }
+    };
+
+    if (brokenCatImages.includes(cat.id)) {
+      return <span className="mr-1.5 flex items-center">{glyph()}</span>;
     }
+
+    return (
+      <img
+        src={cat.image}
+        alt=""
+        loading="lazy"
+        onError={(e) => {
+          const el = e.currentTarget as HTMLImageElement;
+          if (el.src !== cat.imageFallback) {
+            el.src = cat.imageFallback;
+          } else {
+            setBrokenCatImages((prev) => prev.includes(cat.id) ? prev : [...prev, cat.id]);
+          }
+        }}
+        className="w-[22px] h-[22px] rounded-full object-cover mr-2 shrink-0 ring-1 ring-black/8"
+      />
+    );
   };
 
   // Filter items in real time based on active category tabs and search bars
@@ -493,7 +624,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   {activeOrder.status === 'Awaiting Payment' && 'Awaiting payment'}
                   {activeOrder.status === 'Pending' && 'Confirming order'}
                   {activeOrder.status === 'Preparing' && 'Preparing your order'}
-                  {activeOrder.status === 'Out for Table' && 'On its way to your table'}
+                  {activeOrder.status === 'Out for Table' && 'On its way to your shop'}
                   {activeOrder.status === 'Delivered' && 'Served, enjoy'}
                 </div>
               </div>
@@ -705,13 +836,13 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   onClick={() => {
                     setActiveCategory(cat.id);
                   }}
-                  className={`shrink-0 px-4 py-2 rounded-full text-[12px] font-medium flex items-center transition-all duration-200 active:scale-95 border ${
+                  className={`shrink-0 pl-1.5 pr-4 py-1.5 rounded-full text-[12px] font-medium flex items-center transition-all duration-200 active:scale-95 border ${
                     active
                       ? 'bg-espresso text-cream border-espresso'
                       : 'bg-card hover:bg-paper-2 text-muted border-line hover:text-ink'
                   }`}
                 >
-                  {renderCatIcon(cat.icon)}
+                  {renderCatIcon(cat)}
                   <span className="font-sans">{cat.nameEn}</span>
                 </button>
               );
@@ -1001,24 +1132,144 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
               <form onSubmit={handlePlaceOrder} className="pt-5 border-t border-line space-y-4">
                 <h4 className="text-[11px] text-faint font-sans">Where to bring it</h4>
 
-                {/* Table selector (Urgent for QR menus!) */}
+                {/* Step 1 — Floor */}
                 <div className="space-y-1.5">
-                  <label className="text-[12px] font-medium text-ink block">Table *</label>
-                  <select
-                    required
-                    value={tableNumber}
-                    onChange={(e) => setTableNumber(e.target.value)}
-                    className="w-full text-[13px] font-sans bg-card border border-line rounded-xl px-3.5 py-3 text-ink focus:outline-none focus:border-accent/50 transition"
-                  >
-                    <option value="">Choose your table</option>
-                    {[...Array(20)].map((_, i) => {
-                      const tStr = String(i + 1).padStart(2, '0');
-                      return (
-                        <option key={i} value={tStr}>Table {tStr}</option>
-                      );
-                    })}
-                  </select>
+                  <label className="text-[12px] font-medium text-ink block">
+                    Floor / الدور <span className="text-accent">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { value: '1' as const, en: '1st Floor', ar: 'الدور الأول' },
+                      { value: '2' as const, en: '2nd Floor', ar: 'الدور الثاني' },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleSelectFloor(opt.value)}
+                        className={`px-3 py-2.5 rounded-xl border text-center transition duration-150 cursor-pointer flex flex-col items-center gap-0.5 active:scale-[0.98] ${
+                          floor === opt.value
+                            ? 'bg-espresso border-espresso text-cream'
+                            : 'bg-card border-line text-muted hover:border-accent/40 hover:text-ink'
+                        }`}
+                      >
+                        <span className="text-[13px] font-medium">{opt.en}</span>
+                        <span className="text-[10px] opacity-80 font-serif">{opt.ar}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Step 2 — Gate (1st floor only) */}
+                {floor === '1' && (
+                  <div className="space-y-1.5 animate-fadeIn">
+                    <label className="text-[12px] font-medium text-ink block">
+                      Gate / البوابة <span className="text-accent">*</span>
+                    </label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {['1', '2', '3', '4', '5'].map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => setGate(g)}
+                          className={`py-2.5 rounded-xl border text-[13px] font-mono font-semibold transition duration-150 cursor-pointer active:scale-[0.98] ${
+                            gate === g
+                              ? 'bg-accent border-accent text-cream'
+                              : 'bg-card border-line text-muted hover:border-accent/40 hover:text-ink'
+                          }`}
+                        >
+                          {g}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-faint">Pick the gate closest to your shop.</p>
+                  </div>
+                )}
+
+                {/* Step 3 — Shop name */}
+                {floor && (
+                  <div className="space-y-1.5 animate-fadeIn">
+                    <label className="text-[12px] font-medium text-ink block">
+                      Shop name / اسم المحل <span className="text-accent">*</span>
+                    </label>
+                    <div className="relative">
+                      <Store className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" strokeWidth={1.6} />
+                      <input
+                        type="text"
+                        placeholder="e.g. Al Noor Electronics"
+                        value={shopName}
+                        onChange={(e) => setShopName(e.target.value)}
+                        className="w-full text-[13px] bg-card border border-line rounded-xl pl-10 pr-3.5 py-3 text-ink placeholder-faint focus:outline-none focus:border-accent/50 transition"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4 — Signboard photo */}
+                {floor && (
+                  <div className="space-y-1.5 animate-fadeIn">
+                    <label className="text-[12px] font-medium text-ink block">
+                      Signboard photo / صورة اللوحة <span className="text-accent">*</span>
+                    </label>
+
+                    <input
+                      ref={signboardInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleSignboardChange}
+                      className="hidden"
+                    />
+
+                    {signboardPreview ? (
+                      <div className="flex items-center gap-3 p-2.5 bg-card border border-line rounded-xl">
+                        <img
+                          src={signboardPreview}
+                          alt="Your shop signboard"
+                          className="w-14 h-14 rounded-lg object-cover border border-line shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          {isUploadingSignboard ? (
+                            <p className="text-[12px] text-muted">Uploading…</p>
+                          ) : signboardUrl ? (
+                            <p className="text-[12px] font-medium text-accent flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" strokeWidth={2} /> Photo ready
+                            </p>
+                          ) : (
+                            <p className="text-[12px] text-muted">Upload failed, try again</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => signboardInputRef.current?.click()}
+                            className="text-[11px] text-faint hover:text-ink transition font-medium"
+                          >
+                            Change photo
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveSignboard}
+                          className="p-1.5 rounded-full text-faint hover:text-ink hover:bg-paper-2 transition shrink-0"
+                          aria-label="Remove signboard photo"
+                        >
+                          <X className="w-4 h-4" strokeWidth={1.8} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => signboardInputRef.current?.click()}
+                        disabled={isUploadingSignboard}
+                        className="w-full px-3.5 py-4 rounded-xl border border-dashed border-line bg-card hover:border-accent/40 text-muted hover:text-ink transition flex flex-col items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Camera className="w-5 h-5 text-accent" strokeWidth={1.6} />
+                        <span className="text-[12.5px] font-medium">
+                          {isUploadingSignboard ? 'Uploading…' : 'Take or upload a photo'}
+                        </span>
+                        <span className="text-[10.5px] text-faint">So the runner can find your shop</span>
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Name */}
                 <div className="space-y-1.5">
@@ -1309,10 +1560,10 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   <div className="absolute left-[9px] top-2 bottom-2 w-px bg-line" />
 
                   {[
-                    { done: ['Awaiting Payment', 'Pending', 'Preparing', 'Out for Table', 'Delivered'].includes(activeOrder.status), active: activeOrder.status === 'Awaiting Payment' || activeOrder.status === 'Pending', title: 'Order received', sub: `Placed for table ${activeOrder.tableNumber}` },
+                    { done: ['Awaiting Payment', 'Pending', 'Preparing', 'Out for Table', 'Delivered'].includes(activeOrder.status), active: activeOrder.status === 'Awaiting Payment' || activeOrder.status === 'Pending', title: 'Order received', sub: `Placed for ${describeDestination(activeOrder)}` },
                     { done: ['Preparing', 'Out for Table', 'Delivered'].includes(activeOrder.status), active: activeOrder.status === 'Preparing', title: 'Preparing', sub: 'Your drinks and pastries are being made' },
-                    { done: ['Out for Table', 'Delivered'].includes(activeOrder.status), active: activeOrder.status === 'Out for Table', title: 'On its way', sub: `Heading to table ${activeOrder.tableNumber}` },
-                    { done: activeOrder.status === 'Delivered', active: false, title: 'Served', sub: 'Delivered to your table' },
+                    { done: ['Out for Table', 'Delivered'].includes(activeOrder.status), active: activeOrder.status === 'Out for Table', title: 'On its way', sub: `Heading to ${describeDestination(activeOrder)}` },
+                    { done: activeOrder.status === 'Delivered', active: false, title: 'Served', sub: 'Delivered to your shop' },
                   ].map((step, i) => (
                     <div key={i} className="relative flex items-start gap-3.5">
                       <div className={`absolute left-[-27px] top-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center transition-all ${

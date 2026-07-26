@@ -12,14 +12,34 @@ export interface MenuItem {
   image?: string;
 }
 
-export const CATEGORIES = [
-  { id: 'specials', nameEn: 'Specials', nameAr: 'المميزة', icon: 'Sparkles' },
-  { id: 'sweet', nameEn: 'Sweet', nameAr: 'حلويات', icon: 'CakeSlice' },
-  { id: 'boba', nameEn: 'Boba Drinks', nameAr: 'بوبا', icon: 'Milk' },
-  { id: 'cold', nameEn: 'Cold Drinks', nameAr: 'مشروبات باردة', icon: 'CupSoda' },
-  { id: 'matcha', nameEn: 'Matcha & Shake', nameAr: 'ماتشا وميلك شيك', icon: 'IceCream' },
-  { id: 'juice', nameEn: 'Juice', nameAr: 'عصير', icon: 'Citrus' },
-  { id: 'hot', nameEn: 'Hot Drinks', nameAr: 'مشروبات ساخنة', icon: 'Coffee' },
+// Branded Iconic Coffee category shots. `image` is bundled with the app (public/categories);
+// `imageFallback` points at the same file on the Supabase CDN and is only used if the
+// bundled asset fails to load (e.g. an old cached build).
+export const CATEGORY_IMAGE_CDN =
+  'https://aaetqwwpsigcuwyuhlvy.supabase.co/storage/v1/object/public/menu-assets/categories';
+
+export interface Category {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  icon: string;
+  image: string;
+  imageFallback: string;
+}
+
+const categoryImage = (slug: string) => ({
+  image: `/categories/${slug}.webp`,
+  imageFallback: `${CATEGORY_IMAGE_CDN}/${slug}.jpg`,
+});
+
+export const CATEGORIES: Category[] = [
+  { id: 'specials', nameEn: 'Specials', nameAr: 'المميزة', icon: 'Sparkles', ...categoryImage('specials') },
+  { id: 'sweet', nameEn: 'Sweet', nameAr: 'حلويات', icon: 'CakeSlice', ...categoryImage('sweet') },
+  { id: 'boba', nameEn: 'Boba Drinks', nameAr: 'بوبا', icon: 'Milk', ...categoryImage('boba') },
+  { id: 'cold', nameEn: 'Cold Drinks', nameAr: 'مشروبات باردة', icon: 'CupSoda', ...categoryImage('cold') },
+  { id: 'matcha', nameEn: 'Matcha & Shake', nameAr: 'ماتشا وميلك شيك', icon: 'IceCream', ...categoryImage('matcha') },
+  { id: 'juice', nameEn: 'Juice', nameAr: 'عصير', icon: 'Citrus', ...categoryImage('juice') },
+  { id: 'hot', nameEn: 'Hot Drinks', nameAr: 'مشروبات ساخنة', icon: 'Coffee', ...categoryImage('hot') },
 ];
 
 export const MENU_ITEMS: MenuItem[] = [

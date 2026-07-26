@@ -39,6 +39,18 @@ interface OrderItem {
 interface Order {
   id: string;
   customerName: string;
+  /** '1' or '2' — the floor the order is delivered to. */
+  floor: string;
+  /** '1'..'5'. Only meaningful on the 1st floor; the 2nd floor has no gates. */
+  gate?: string;
+  shopName: string;
+  /** Public URL of the shop signboard photo the customer uploaded. */
+  signboardUrl?: string;
+  /**
+   * Human-readable destination ("Floor 1 · Gate 3 · Al Noor Store"). Kept under the
+   * original `tableNumber` key/column so pre-existing orders, exports and any external
+   * sheet integration keep resolving to a destination instead of going blank.
+   */
   tableNumber: string;
   phoneNumber?: string;
   items: OrderItem[];
@@ -47,6 +59,16 @@ interface Order {
   createdAt: string;
   estimatedTimeMinutes: number;
   salesPerson?: string;
+}
+
+const FLOOR_LABELS: Record<string, string> = { "1": "1st Floor", "2": "2nd Floor" };
+
+/** Builds the single-line destination shown on tickets, the tracker and exports. */
+function formatDeliveryLabel(floor: string, gate?: string, shopName?: string) {
+  const parts = [FLOOR_LABELS[floor] || `Floor ${floor}`];
+  if (floor === "1" && gate) parts.push(`Gate ${gate}`);
+  if (shopName) parts.push(shopName);
+  return parts.join(" · ");
 }
 
 interface StaffMember {
@@ -201,7 +223,10 @@ const app = express();
     {
       id: "1001",
       customerName: "Rabiul",
-      tableNumber: "03",
+      floor: "1",
+      gate: "3",
+      shopName: "Al Noor Electronics",
+      tableNumber: "1st Floor · Gate 3 · Al Noor Electronics",
       phoneNumber: "0501234567",
       items: [
         { id: "spec-1", nameEn: "PISTACHIO ROSE LATTE", nameAr: "لاتيه الفستق والورد", price: 22, quantity: 1 },
@@ -216,7 +241,9 @@ const app = express();
     {
       id: "1002",
       customerName: "Yousuf",
-      tableNumber: "07",
+      floor: "2",
+      shopName: "Golden Tailors",
+      tableNumber: "2nd Floor · Golden Tailors",
       phoneNumber: "0559876543",
       items: [
         { id: "boba-1", nameEn: "SIGNATURE BROWN SUGAR BOBA", nameAr: "بوبا سكر بني إسجنتشر", price: 20, quantity: 2 },
@@ -425,6 +452,10 @@ const app = express();
           const parsedOrders = data.map((d: any) => ({
             id: d.id,
             customerName: d.customer_name,
+            floor: d.floor || "",
+            gate: d.gate || "",
+            shopName: d.shop_name || "",
+            signboardUrl: d.signboard_url || "",
             tableNumber: d.table_number,
             phoneNumber: d.phone_number || "",
             totalPrice: Number(d.total_price),
@@ -450,6 +481,10 @@ const app = express();
       const { error } = await supabase.from("orders").upsert({
         id: o.id,
         customer_name: o.customerName,
+        floor: o.floor || "",
+        gate: o.gate || "",
+        shop_name: o.shopName || "",
+        signboard_url: o.signboardUrl || "",
         table_number: o.tableNumber,
         phone_number: o.phoneNumber || "",
         total_price: o.totalPrice,
@@ -687,10 +722,33 @@ const app = express();
     res.json({ success: true, sheetsConfig });
   });
 
-  // Dedicated API to decode base64 sent from React product form, save to uploads, and return public url link
-  app.post("/api/upload", (req, res) => {
+  // Public Supabase Storage buckets. Serverless hosts wipe the local filesystem between
+  // invocations, so anything that must outlive the request (customer signboard photos in
+  // particular) goes to Storage; local disk is only the offline/dev fallback.
+  const SIGNBOARD_BUCKET = "signboards";
+  const MENU_ASSET_BUCKET = "menu-assets";
+
+  async function uploadToSupabaseStorage(bucket: string, objectPath: string, buffer: Buffer, mimeType: string) {
+    if (!supabase) return null;
     try {
-      const { filename, base64 } = req.body;
+      const { error } = await supabase.storage.from(bucket).upload(objectPath, buffer, {
+        contentType: mimeType,
+        upsert: true
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from(bucket).getPublicUrl(objectPath);
+      return data?.publicUrl || null;
+    } catch (err: any) {
+      console.error(`✕ Supabase Storage upload to '${bucket}' failed:`, err.message);
+      return null;
+    }
+  }
+
+  // Dedicated API to decode base64 sent from React forms, store the image, and return a public url link.
+  // `kind: "signboard"` files land in the signboards bucket; everything else is a product image.
+  app.post("/api/upload", async (req, res) => {
+    try {
+      const { filename, base64, kind } = req.body;
       if (!filename || !base64) {
         return res.status(400).json({ error: "Missing filename or image data" });
       }
@@ -710,9 +768,19 @@ const app = express();
       }
 
       // Determine clean safe file extension
-      const safeExt = filename.split(".").pop() || "png";
-      const randomizedName = `product_${Date.now()}_${Math.floor(Math.random() * 100000)}.${safeExt}`;
-      
+      const safeExt = (filename.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      const isSignboard = kind === "signboard";
+      const prefix = isSignboard ? "signboard" : "product";
+      const randomizedName = `${prefix}_${Date.now()}_${Math.floor(Math.random() * 100000)}.${safeExt}`;
+
+      const bucket = isSignboard ? SIGNBOARD_BUCKET : MENU_ASSET_BUCKET;
+      const objectPath = isSignboard ? `uploads/${randomizedName}` : `products/${randomizedName}`;
+      const publicUrl = await uploadToSupabaseStorage(bucket, objectPath, buffer, mimeType);
+      if (publicUrl) {
+        console.log(`✓ Image uploaded to Supabase Storage: ${bucket}/${objectPath}`);
+        return res.json({ success: true, url: publicUrl, storage: "supabase" });
+      }
+
       let filePath = path.join(UPLOADS_DIR, randomizedName);
       try {
         fs.writeFileSync(filePath, buffer);
@@ -724,7 +792,7 @@ const app = express();
       }
 
       const resourceUrl = `/uploads/${randomizedName}`;
-      res.json({ success: true, url: resourceUrl });
+      res.json({ success: true, url: resourceUrl, storage: "local" });
     } catch (err: any) {
       console.error("✕ Upload file error:", err.message);
       res.status(500).json({ error: "Failed to parse upload request: " + err.message });
@@ -1044,11 +1112,28 @@ const app = express();
   // Create a new order
   app.post("/api/orders", async (req, res) => {
     try {
-      const { customerName, tableNumber, phoneNumber, items, salesPerson, status, redeemReward, redeemType } = req.body;
+      const { customerName, floor, gate, shopName, signboardUrl, phoneNumber, items, salesPerson, status, redeemReward, redeemType } = req.body;
 
-      if (!customerName || !tableNumber || !items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: "Missing required fields: customerName, tableNumber, items" });
+      if (!customerName || !items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Missing required fields: customerName, items" });
       }
+
+      const cleanFloor = String(floor || "").trim();
+      const cleanGate = String(gate || "").trim();
+      const cleanShopName = String(shopName || "").trim();
+
+      if (cleanFloor !== "1" && cleanFloor !== "2") {
+        return res.status(400).json({ error: "Please select your floor (1st Floor or 2nd Floor)." });
+      }
+      // Gates only exist on the 1st floor.
+      if (cleanFloor === "1" && !["1", "2", "3", "4", "5"].includes(cleanGate)) {
+        return res.status(400).json({ error: "Please select your gate (1 to 5) for the 1st Floor." });
+      }
+      if (!cleanShopName) {
+        return res.status(400).json({ error: "Please enter your shop name." });
+      }
+
+      const deliveryLabel = formatDeliveryLabel(cleanFloor, cleanGate, cleanShopName);
 
       // Generate a short 4-digit order ID starting from 1003 or incremented
       const activeOrders = await getOrdersListFromSupabase();
@@ -1178,7 +1263,11 @@ const app = express();
       const newOrder: Order = {
         id: nextId,
         customerName,
-        tableNumber,
+        floor: cleanFloor,
+        gate: cleanFloor === "1" ? cleanGate : "",
+        shopName: cleanShopName,
+        signboardUrl: signboardUrl || "",
+        tableNumber: deliveryLabel,
         phoneNumber: phoneNumber || "",
         items,
         totalPrice: finalPrice,
@@ -1239,12 +1328,29 @@ const app = express();
   app.get("/api/export-sheets", async (req, res) => {
     try {
       const activeOrders = await getOrdersListFromSupabase();
-      let csvContent = "Order ID,Customer Name,Table Number,Contact,Status,Created At,Total Price,Items,Salesperson\n";
-      
+      let csvContent = "Order ID,Customer Name,Floor,Gate,Shop Name,Signboard Photo,Destination,Contact,Status,Created At,Total Price,Items,Salesperson\n";
+
+      const csv = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
       activeOrders.forEach(order => {
         const itemsSummary = order.items.map(item => `${item.nameEn} (x${item.quantity})`).join(" | ");
         const cleanedDate = order.createdAt.replace(/T/, " ").replace(/\..+/, "");
-        csvContent += `"${order.id}","${order.customerName.replace(/"/g, '""')}","${order.tableNumber}","${order.phoneNumber || ''}","${order.status}","${cleanedDate}",SR ${order.totalPrice},"${itemsSummary.replace(/"/g, '""')}","${order.salesPerson || ''}"\n`;
+        const floorLabel = order.floor ? (FLOOR_LABELS[order.floor] || `Floor ${order.floor}`) : "";
+        csvContent += [
+          csv(order.id),
+          csv(order.customerName),
+          csv(floorLabel),
+          csv(order.gate ? `Gate ${order.gate}` : ""),
+          csv(order.shopName),
+          csv(order.signboardUrl),
+          csv(order.tableNumber),
+          csv(order.phoneNumber || ""),
+          csv(order.status),
+          csv(cleanedDate),
+          `SR ${order.totalPrice}`,
+          csv(itemsSummary),
+          csv(order.salesPerson || "")
+        ].join(",") + "\n";
       });
 
       res.setHeader("Content-Type", "text/csv");

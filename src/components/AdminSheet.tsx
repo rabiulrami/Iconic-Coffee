@@ -37,6 +37,13 @@ interface OrderItem {
 interface Order {
   id: string;
   customerName: string;
+  /** '1' or '2'. Empty on orders placed before the floor/gate rollout. */
+  floor?: string;
+  /** '1'..'5', 1st floor only. */
+  gate?: string;
+  shopName?: string;
+  signboardUrl?: string;
+  /** Human-readable destination label; the legacy field older orders still use. */
   tableNumber: string;
   phoneNumber?: string;
   items: OrderItem[];
@@ -45,6 +52,17 @@ interface Order {
   createdAt: string;
   estimatedTimeMinutes: number;
   salesPerson?: string;
+}
+
+/** Single-line destination for an order, tolerant of pre-rollout rows. */
+function describeDestination(order: Pick<Order, 'floor' | 'gate' | 'shopName' | 'tableNumber'>) {
+  if (order.floor) {
+    const parts = [order.floor === '2' ? '2nd Floor' : '1st Floor'];
+    if (order.floor === '1' && order.gate) parts.push(`Gate ${order.gate}`);
+    if (order.shopName) parts.push(order.shopName);
+    return parts.join(' · ');
+  }
+  return order.tableNumber || '—';
 }
 
 interface AdminSheetProps {
@@ -113,7 +131,9 @@ export default function AdminSheet({ currentUser, onBackToMenu }: AdminSheetProp
   // Staff manual order creation states
   const [showStaffOrderModal, setShowStaffOrderModal] = useState(false);
   const [staffCustomerName, setStaffCustomerName] = useState('Walk-in Guest');
-  const [staffTableNumber, setStaffTableNumber] = useState('01');
+  const [staffFloor, setStaffFloor] = useState<'1' | '2'>('1');
+  const [staffGate, setStaffGate] = useState('1');
+  const [staffShopName, setStaffShopName] = useState('');
   const [staffSalesPerson, setStaffSalesPerson] = useState(currentUser ? currentUser.name : 'Owner');
   const [staffOrderStatus, setStaffOrderStatus] = useState<'Preparing' | 'Delivered' | 'Awaiting Payment'>('Preparing');
   const [staffCart, setStaffCart] = useState<{ id: string; quantity: number }[]>([]);
@@ -161,6 +181,9 @@ export default function AdminSheet({ currentUser, onBackToMenu }: AdminSheetProp
   const [dbStatusMsg, setDbStatusMsg] = useState('');
   const [sqlCopied, setSqlCopied] = useState(false);
 
+  // Signboard photo currently open in the lightbox
+  const [viewingSignboard, setViewingSignboard] = useState<string | null>(null);
+
   // Non-blocking confirmation flags to prevent window.confirm/alert iframe block errors
   const [confirmVoidIdentifier, setConfirmVoidIdentifier] = useState<string | null>(null);
   const [confirmDeleteStaffId, setConfirmDeleteStaffId] = useState<string | null>(null);
@@ -194,6 +217,10 @@ CREATE TABLE IF NOT EXISTS staff (
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
   customer_name TEXT,
+  floor TEXT,
+  gate TEXT,
+  shop_name TEXT,
+  signboard_url TEXT,
   table_number TEXT,
   phone_number TEXT,
   total_price NUMERIC,
@@ -203,6 +230,12 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   estimated_time_minutes INTEGER DEFAULT 10
 );
+
+-- 3b. Upgrade an existing 'orders' table created before the floor/gate rollout
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS floor TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS gate TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shop_name TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS signboard_url TEXT;
 
 -- 4. Create 'loyalty' table
 CREATE TABLE IF NOT EXISTS loyalty (
@@ -231,7 +264,21 @@ DROP POLICY IF EXISTS "Allow all for anonymous users on orders" ON public.orders
 CREATE POLICY "Allow all for anonymous users on orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow all for anonymous users on loyalty" ON public.loyalty;
-CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR ALL USING (true) WITH CHECK (true);`;
+CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR ALL USING (true) WITH CHECK (true);
+
+-- 5. Storage: customer shop-signboard photos and branded menu images.
+--    Create both buckets as PUBLIC under Storage -> Buckets first, then run these policies.
+DROP POLICY IF EXISTS "Public read signboards" ON storage.objects;
+CREATE POLICY "Public read signboards" ON storage.objects FOR SELECT USING (bucket_id = 'signboards');
+
+DROP POLICY IF EXISTS "Anon upload signboards" ON storage.objects;
+CREATE POLICY "Anon upload signboards" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'signboards');
+
+DROP POLICY IF EXISTS "Public read menu-assets" ON storage.objects;
+CREATE POLICY "Public read menu-assets" ON storage.objects FOR SELECT USING (bucket_id = 'menu-assets');
+
+DROP POLICY IF EXISTS "Anon upload menu-assets" ON storage.objects;
+CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'menu-assets');`;
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(supabaseSqlQuery);
@@ -887,6 +934,11 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
       return;
     }
 
+    if (!staffShopName.trim()) {
+      showToast("Please enter the shop name this order is delivered to.", "error");
+      return;
+    }
+
     const orderPayloadItems = cartItems.map(item => ({
       id: item.prod.id,
       nameEn: item.prod.nameEn,
@@ -901,7 +953,9 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName: staffCustomerName.trim() || 'Walk-in Guest',
-          tableNumber: staffTableNumber,
+          floor: staffFloor,
+          gate: staffFloor === '1' ? staffGate : '',
+          shopName: staffShopName.trim(),
           phoneNumber: staffPhoneNumber.trim(),
           items: orderPayloadItems,
           salesPerson: staffSalesPerson,
@@ -916,13 +970,15 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
         setShowStaffOrderModal(false);
         setStaffCart([]);
         setStaffCustomerName('Walk-in Guest');
+        setStaffShopName('');
         setStaffPhoneNumber('');
         setStaffRedeemReward(false);
         setStaffRedeemType('20_percent');
         setStaffLoyaltyProfile(null);
         fetchOrders();
       } else {
-        showToast("Server refused logging staff order records.", "error");
+        const data = await response.json().catch(() => null);
+        showToast(data?.error || "Server refused logging staff order records.", "error");
       }
     } catch (err) {
       console.error(err);
@@ -932,10 +988,11 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
 
   // Filter lists inside viewport
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const query = searchQuery.toLowerCase();
+    const matchesSearch =
+      order.customerName.toLowerCase().includes(query) ||
       order.id.includes(searchQuery) ||
-      order.tableNumber.includes(searchQuery);
+      describeDestination(order).toLowerCase().includes(query);
 
     const matchesStatus = filterStatus === 'All' || order.status === filterStatus;
     return matchesSearch && matchesStatus;
@@ -1136,7 +1193,7 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                   <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
                   <div>
                     <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 block font-mono">ACTIVE QUEUE</span>
-                    <span className="text-xl sm:text-2xl font-black text-amber-500 block mt-1 tracking-tight">{activeOrdersCount} Tables</span>
+                    <span className="text-xl sm:text-2xl font-black text-amber-500 block mt-1 tracking-tight">{activeOrdersCount} Orders</span>
                     <span className="text-[9px] text-slate-500 font-mono">Currently serving live streams</span>
                   </div>
                   <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shadow-inner">
@@ -1225,7 +1282,9 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                     onClick={() => {
                       setStaffCart([]);
                       setStaffCustomerName("Walk-in Guest");
-                      setStaffTableNumber("Takeaway");
+                      setStaffFloor("1");
+                      setStaffGate("1");
+                      setStaffShopName("");
                       setStaffSalesPerson(currentUser ? currentUser.name : "Owner");
                       setStaffOrderStatus("Preparing");
                       setStaffSearchQuery("");
@@ -1263,7 +1322,7 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                     <thead>
                       <tr className="bg-amber-900/10 border-b border-slate-800 text-amber-400 font-bold uppercase tracking-wider select-none text-[10px]">
                         <th className="py-3 px-4 border-r border-slate-800">Order ID</th>
-                        <th className="py-3 px-4 border-r border-slate-800">Table</th>
+                        <th className="py-3 px-4 border-r border-slate-800">Delivery Destination</th>
                         <th className="py-3 px-4 border-r border-slate-800">Customer Name</th>
                         <th className="py-3 px-4 border-r border-slate-800">Selected Items (Qty)</th>
                         <th className="py-3 px-4 border-r border-slate-800">Bill (SR)</th>
@@ -1286,7 +1345,44 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                             className={`hover:bg-slate-900/85 transition-all ${idx % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/30'}`}
                           >
                             <td className="py-3.5 px-4 font-bold text-slate-200 border-r border-slate-800/50">#{order.id}</td>
-                            <td className="py-3.5 px-4 text-orange-400 font-bold border-r border-slate-800/50 text-center">{order.tableNumber}</td>
+                            <td className="py-3.5 px-4 border-r border-slate-800/50 align-top">
+                              {order.floor ? (
+                                <div className="flex items-start gap-2.5">
+                                  {order.signboardUrl ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingSignboard(order.signboardUrl!)}
+                                      title="View shop signboard photo"
+                                      className="shrink-0 cursor-pointer active:scale-95 transition"
+                                    >
+                                      <img
+                                        src={order.signboardUrl}
+                                        alt={`${order.shopName || 'Shop'} signboard`}
+                                        className="w-11 h-11 rounded-lg object-cover border border-slate-700 hover:border-amber-500/60 transition"
+                                      />
+                                    </button>
+                                  ) : (
+                                    <div className="w-11 h-11 rounded-lg border border-dashed border-slate-800 flex items-center justify-center shrink-0">
+                                      <ImageIcon className="w-4 h-4 text-slate-700" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="text-orange-400 font-bold text-[11px] whitespace-nowrap">
+                                      {order.floor === '2' ? '2nd Floor' : '1st Floor'}
+                                      {order.floor === '1' && order.gate && (
+                                        <span className="text-amber-500"> · Gate {order.gate}</span>
+                                      )}
+                                    </div>
+                                    <div className="text-slate-200 text-[11px] font-semibold truncate max-w-[170px]" title={order.shopName}>
+                                      {order.shopName || '—'}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Order predates the floor/gate rollout — show its legacy label
+                                <span className="text-orange-400 font-bold">{order.tableNumber || '—'}</span>
+                              )}
+                            </td>
                             <td className="py-3.5 px-4 border-r border-slate-800/50">
                               <div className="font-semibold text-slate-100">{order.customerName}</div>
                               {order.phoneNumber && <span className="text-[10px] text-slate-500 block">{order.phoneNumber}</span>}
@@ -1422,7 +1518,7 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
           // Salesperson Stats
           const salespersonStats: { [key: string]: { revenue: number, count: number } } = {};
           completedOrders.forEach(o => {
-            const spName = o.salesPerson || "Self Service / Table QR";
+            const spName = o.salesPerson || "Self Service / QR Menu";
             if (!salespersonStats[spName]) {
               salespersonStats[spName] = { revenue: 0, count: 0 };
             }
@@ -2482,7 +2578,11 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                     <div className="text-slate-400 space-y-1">
                       <p>• <span className="text-slate-200 font-bold">id</span> (text, PK)</p>
                       <p>• <span className="text-slate-200">customer_name</span> (text)</p>
-                      <p>• <span className="text-slate-200">table_number</span> (text)</p>
+                      <p>• <span className="text-slate-200">floor</span> (text)</p>
+                      <p>• <span className="text-slate-200">gate</span> (text)</p>
+                      <p>• <span className="text-slate-200">shop_name</span> (text)</p>
+                      <p>• <span className="text-slate-200">signboard_url</span> (text)</p>
+                      <p>• <span className="text-slate-200">table_number</span> (text, legacy label)</p>
                       <p>• <span className="text-slate-200">phone_number</span> (text)</p>
                       <p>• <span className="text-slate-200">total_price</span> (numeric)</p>
                       <p>• <span className="text-slate-200">status</span> (text)</p>
@@ -2826,18 +2926,46 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block font-mono">Serving Table Number</label>
+                  <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block font-mono">Delivery Shop Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={staffShopName}
+                    onChange={(e) => setStaffShopName(e.target.value)}
+                    placeholder="e.g. Al Noor Electronics"
+                    className="w-full text-xs bg-slate-950 border border-slate-800 rounded pl-3 pr-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500 font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Row 1.2: Delivery destination (floor, and gate on the 1st floor) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block font-mono">Floor</label>
                   <select
-                    value={staffTableNumber}
-                    onChange={(e) => setStaffTableNumber(e.target.value)}
+                    value={staffFloor}
+                    onChange={(e) => setStaffFloor(e.target.value as '1' | '2')}
                     className="w-full text-xs bg-slate-950 border border-slate-800 rounded pl-3 pr-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500 font-bold cursor-pointer"
                   >
-                    <option value="Takeaway">Takeaway (سفري) 🥡</option>
-                    {Array.from({ length: 20 }, (_, i) => {
-                      const num = String(i + 1).padStart(2, '0');
-                      return <option key={num} value={num}>Table {num} (طاولة {num}) ☕</option>;
-                    })}
+                    <option value="1">1st Floor (الدور الأول)</option>
+                    <option value="2">2nd Floor (الدور الثاني)</option>
                   </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block font-mono">Gate</label>
+                  <select
+                    value={staffGate}
+                    onChange={(e) => setStaffGate(e.target.value)}
+                    disabled={staffFloor === '2'}
+                    className="w-full text-xs bg-slate-950 border border-slate-800 rounded pl-3 pr-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500 font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {['1', '2', '3', '4', '5'].map((g) => (
+                      <option key={g} value={g}>Gate {g} (بوابة {g})</option>
+                    ))}
+                  </select>
+                  {staffFloor === '2' && (
+                    <p className="text-[9px] text-slate-500 font-mono">The 2nd floor has no gates.</p>
+                  )}
                 </div>
               </div>
 
@@ -3088,6 +3216,30 @@ CREATE POLICY "Allow all for anonymous users on loyalty" ON public.loyalty FOR A
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Shop signboard photo lightbox */}
+      {viewingSignboard && (
+        <div
+          onClick={() => setViewingSignboard(null)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[80] flex items-center justify-center p-6 animate-fadeIn"
+        >
+          <div className="relative max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={viewingSignboard}
+              alt="Shop signboard"
+              className="w-full max-h-[80vh] object-contain rounded-2xl border border-slate-700 shadow-2xl bg-slate-950"
+            />
+            <button
+              type="button"
+              onClick={() => setViewingSignboard(null)}
+              className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:border-amber-500/60 flex items-center justify-center cursor-pointer transition"
+              aria-label="Close signboard photo"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
