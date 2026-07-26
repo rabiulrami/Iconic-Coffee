@@ -21,7 +21,7 @@ hosts like Vercel. That is why data appeared "not connected." Follow the 3 steps
 This creates the four tables (`products`, `staff`, `orders`, `loyalty`) and opens access so the
 app's public key can read and write them. You only need to do this once. Re-running it on an
 existing project is safe — it also adds the newer `orders` columns (`floor`, `gate`,
-`shop_name`, `signboard_url`) if they are missing.
+`shop_name`, `signboard_url`, `payment_method`) if they are missing.
 
 ## Step 1b — Create the two storage buckets
 

@@ -25,7 +25,9 @@ import {
   Award,
   Lock,
   Store,
-  Camera
+  Camera,
+  Banknote,
+  CreditCard
 } from 'lucide-react';
 import { CATEGORIES, MENU_ITEMS, Category, MenuItem } from '../data';
 import MenuImage from './MenuImage';
@@ -76,6 +78,8 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   const [shopName, setShopName] = useState('');
   const [signboardUrl, setSignboardUrl] = useState('');
   const [signboardPreview, setSignboardPreview] = useState('');
+  // How the customer settles the bill at handover
+  const [paymentMethod, setPaymentMethod] = useState<'' | 'cash' | 'card'>('');
   const [isUploadingSignboard, setIsUploadingSignboard] = useState(false);
   const signboardInputRef = useRef<HTMLInputElement>(null);
 
@@ -445,6 +449,10 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
       triggerToast('Please upload a photo of your shop signboard.', "error");
       return;
     }
+    if (!paymentMethod) {
+      triggerToast('Please choose how you are paying: Cash or Card (Mada).', "error");
+      return;
+    }
 
     if (redeemReward && redeemType === 'free_item' && maxLoyaltyItemPrice === 0) {
       triggerToast("Please add at least one of your 3 Exclusive VIP Loyalty Gifts to your cart to claim your Free Product reward!", "error");
@@ -469,6 +477,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
         gate: floor === '1' ? gate : '',
         shopName: shopName.trim(),
         signboardUrl,
+        paymentMethod,
         phoneNumber: phoneNumber.trim(),
         items: simplifiedItems,
         redeemReward: redeemReward,
@@ -1434,6 +1443,41 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   </div>
                 )}
 
+                {/* Payment method — settled on handover, not in the app */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[12px] font-medium text-ink block">
+                    Payment / الدفع <span className="text-accent">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { value: 'cash' as const, en: 'Cash', ar: 'نقدي', Icon: Banknote },
+                      { value: 'card' as const, en: 'Card · Mada', ar: 'بطاقة · مدى', Icon: CreditCard },
+                    ]).map(({ value, en, ar, Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setPaymentMethod(value)}
+                        className={`px-3 py-2.5 rounded-xl border text-center transition duration-150 cursor-pointer flex flex-col items-center gap-1 active:scale-[0.98] ${
+                          paymentMethod === value
+                            ? 'bg-espresso border-espresso text-cream'
+                            : 'bg-card border-line text-muted hover:border-accent/40 hover:text-ink'
+                        }`}
+                      >
+                        <Icon className={`w-4 h-4 ${paymentMethod === value ? 'text-accent' : ''}`} strokeWidth={1.6} />
+                        <span className="text-[12.5px] font-medium">{en}</span>
+                        <span className="text-[10px] opacity-80 font-serif">{ar}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-faint">
+                    {paymentMethod === 'card'
+                      ? 'Our runner brings the Mada card machine to your shop.'
+                      : paymentMethod === 'cash'
+                      ? 'Pay our runner in cash when the order arrives.'
+                      : 'You pay on delivery — nothing is charged now.'}
+                  </p>
+                </div>
+
                 {/* Guarantee check info */}
                 <div className="p-3.5 bg-paper-2 border border-line rounded-xl flex gap-2.5 text-muted">
                   <AlertCircle className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" strokeWidth={1.6} />
@@ -1524,9 +1568,19 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   <div className="text-4xl font-mono text-ink">
                     SR {activeOrder.totalPrice}
                   </div>
-                  <h4 className="text-[13px] font-medium text-ink">Waiting for payment</h4>
+                  <h4 className="text-[13px] font-medium text-ink">
+                    {activeOrder.paymentMethod === 'card'
+                      ? 'Paying by card (Mada)'
+                      : activeOrder.paymentMethod === 'cash'
+                      ? 'Paying in cash'
+                      : 'Waiting for payment'}
+                  </h4>
                   <p className="text-[12px] leading-relaxed text-muted font-sans max-w-[38ch] mx-auto">
-                    Pay at the counter or with your waiter to confirm the order and start preparation.
+                    {activeOrder.paymentMethod === 'card'
+                      ? 'Our runner brings the Mada card machine with your order. Payment confirms it and starts preparation.'
+                      : activeOrder.paymentMethod === 'cash'
+                      ? 'Please have the cash ready for our runner. Payment confirms the order and starts preparation.'
+                      : 'Pay at the counter or with your waiter to confirm the order and start preparation.'}
                   </p>
                   <p className="text-[11px] text-faint font-sans" dir="rtl">يرجى الدفع لتأكيد الطلب وبدء التحضير</p>
                 </div>

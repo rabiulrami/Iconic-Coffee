@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS orders (
   gate TEXT,
   shop_name TEXT,
   signboard_url TEXT,
+  payment_method TEXT,
   table_number TEXT,
   phone_number TEXT,
   total_price NUMERIC,
@@ -56,6 +57,7 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS floor TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS gate TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shop_name TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS signboard_url TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_method TEXT;
 
 -- 4. Loyalty (streak / rewards profiles + app settings row)
 CREATE TABLE IF NOT EXISTS loyalty (

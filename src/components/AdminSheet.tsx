@@ -23,7 +23,9 @@ import {
   Plus,
   Upload,
   Award,
-  Copy
+  Copy,
+  Banknote,
+  CreditCard
 } from 'lucide-react';
 
 interface OrderItem {
@@ -43,6 +45,8 @@ interface Order {
   gate?: string;
   shopName?: string;
   signboardUrl?: string;
+  /** 'cash' or 'card' (mada). Empty on orders placed before payment selection existed. */
+  paymentMethod?: string;
   /** Human-readable destination label; the legacy field older orders still use. */
   tableNumber: string;
   phoneNumber?: string;
@@ -53,6 +57,8 @@ interface Order {
   estimatedTimeMinutes: number;
   salesPerson?: string;
 }
+
+const PAYMENT_LABELS: Record<string, string> = { cash: 'Cash', card: 'Card · Mada' };
 
 /** Single-line destination for an order, tolerant of pre-rollout rows. */
 function describeDestination(order: Pick<Order, 'floor' | 'gate' | 'shopName' | 'tableNumber'>) {
@@ -134,6 +140,7 @@ export default function AdminSheet({ currentUser, onBackToMenu }: AdminSheetProp
   const [staffFloor, setStaffFloor] = useState<'1' | '2'>('1');
   const [staffGate, setStaffGate] = useState('1');
   const [staffShopName, setStaffShopName] = useState('');
+  const [staffPaymentMethod, setStaffPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [staffSalesPerson, setStaffSalesPerson] = useState(currentUser ? currentUser.name : 'Owner');
   const [staffOrderStatus, setStaffOrderStatus] = useState<'Preparing' | 'Delivered' | 'Awaiting Payment'>('Preparing');
   const [staffCart, setStaffCart] = useState<{ id: string; quantity: number }[]>([]);
@@ -221,6 +228,7 @@ CREATE TABLE IF NOT EXISTS orders (
   gate TEXT,
   shop_name TEXT,
   signboard_url TEXT,
+  payment_method TEXT,
   table_number TEXT,
   phone_number TEXT,
   total_price NUMERIC,
@@ -236,6 +244,7 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS floor TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS gate TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shop_name TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS signboard_url TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_method TEXT;
 
 -- 4. Create 'loyalty' table
 CREATE TABLE IF NOT EXISTS loyalty (
@@ -956,6 +965,7 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
           floor: staffFloor,
           gate: staffFloor === '1' ? staffGate : '',
           shopName: staffShopName.trim(),
+          paymentMethod: staffPaymentMethod,
           phoneNumber: staffPhoneNumber.trim(),
           items: orderPayloadItems,
           salesPerson: staffSalesPerson,
@@ -1285,6 +1295,7 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                       setStaffFloor("1");
                       setStaffGate("1");
                       setStaffShopName("");
+                      setStaffPaymentMethod("cash");
                       setStaffSalesPerson(currentUser ? currentUser.name : "Owner");
                       setStaffOrderStatus("Preparing");
                       setStaffSearchQuery("");
@@ -1325,6 +1336,7 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                         <th className="py-3 px-4 border-r border-slate-800">Delivery Destination</th>
                         <th className="py-3 px-4 border-r border-slate-800">Customer Name</th>
                         <th className="py-3 px-4 border-r border-slate-800">Selected Items (Qty)</th>
+                        <th className="py-3 px-4 border-r border-slate-800">Payment</th>
                         <th className="py-3 px-4 border-r border-slate-800">Bill (SR)</th>
                         <th className="py-3 px-4 border-r border-slate-800">Estimated Prep Time</th>
                         <th className="py-3 px-4 border-r border-slate-800">Live Status</th>
@@ -1401,6 +1413,22 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                                   </div>
                                 ))}
                               </div>
+                            </td>
+                            <td className="py-3.5 px-4 border-r border-slate-800/50 whitespace-nowrap">
+                              {order.paymentMethod ? (
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wide ${
+                                  order.paymentMethod === 'card'
+                                    ? 'text-sky-400 bg-sky-500/10 border-sky-500/30'
+                                    : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                                }`}>
+                                  {order.paymentMethod === 'card'
+                                    ? <CreditCard className="w-3.5 h-3.5" />
+                                    : <Banknote className="w-3.5 h-3.5" />}
+                                  {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}
+                                </span>
+                              ) : (
+                                <span className="text-slate-600">—</span>
+                              )}
                             </td>
                             <td className="py-3.5 px-4 font-bold text-emerald-400 border-r border-slate-800/50">SR {order.totalPrice}</td>
                             <td className="py-3.5 px-4 border-r border-slate-800/50">
@@ -2582,6 +2610,7 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                       <p>• <span className="text-slate-200">gate</span> (text)</p>
                       <p>• <span className="text-slate-200">shop_name</span> (text)</p>
                       <p>• <span className="text-slate-200">signboard_url</span> (text)</p>
+                      <p>• <span className="text-slate-200">payment_method</span> (text)</p>
                       <p>• <span className="text-slate-200">table_number</span> (text, legacy label)</p>
                       <p>• <span className="text-slate-200">phone_number</span> (text)</p>
                       <p>• <span className="text-slate-200">total_price</span> (numeric)</p>
@@ -2966,6 +2995,30 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                   {staffFloor === '2' && (
                     <p className="text-[9px] text-slate-500 font-mono">The 2nd floor has no gates.</p>
                   )}
+                </div>
+              </div>
+
+              {/* Row 1.3: How the guest settles the bill */}
+              <div className="space-y-1 shrink-0">
+                <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block font-mono">Payment Method</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { value: 'cash' as const, label: 'Cash (نقدي)', Icon: Banknote },
+                    { value: 'card' as const, label: 'Card · Mada (مدى)', Icon: CreditCard },
+                  ]).map(({ value, label, Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setStaffPaymentMethod(value)}
+                      className={`px-3 py-2 rounded border text-[11px] font-bold flex items-center justify-center gap-2 cursor-pointer transition active:scale-95 ${
+                        staffPaymentMethod === value
+                          ? 'bg-[#9C5D30] border-amber-500/40 text-white'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" /> {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 

@@ -46,6 +46,8 @@ interface Order {
   shopName: string;
   /** Public URL of the shop signboard photo the customer uploaded. */
   signboardUrl?: string;
+  /** How the customer intends to settle the bill: 'cash' or 'card' (mada). */
+  paymentMethod: string;
   /**
    * Human-readable destination ("Floor 1 · Gate 3 · Al Noor Store"). Kept under the
    * original `tableNumber` key/column so pre-existing orders, exports and any external
@@ -62,6 +64,9 @@ interface Order {
 }
 
 const FLOOR_LABELS: Record<string, string> = { "1": "1st Floor", "2": "2nd Floor" };
+
+/** Accepted payment methods and how they read on tickets and exports. */
+const PAYMENT_METHODS: Record<string, string> = { cash: "Cash", card: "Card (Mada)" };
 
 /** Builds the single-line destination shown on tickets, the tracker and exports. */
 function formatDeliveryLabel(floor: string, gate?: string, shopName?: string) {
@@ -227,6 +232,7 @@ const app = express();
       gate: "3",
       shopName: "Al Noor Electronics",
       tableNumber: "1st Floor · Gate 3 · Al Noor Electronics",
+      paymentMethod: "card",
       phoneNumber: "0501234567",
       items: [
         { id: "spec-1", nameEn: "PISTACHIO ROSE LATTE", nameAr: "لاتيه الفستق والورد", price: 22, quantity: 1 },
@@ -244,6 +250,7 @@ const app = express();
       floor: "2",
       shopName: "Golden Tailors",
       tableNumber: "2nd Floor · Golden Tailors",
+      paymentMethod: "cash",
       phoneNumber: "0559876543",
       items: [
         { id: "boba-1", nameEn: "SIGNATURE BROWN SUGAR BOBA", nameAr: "بوبا سكر بني إسجنتشر", price: 20, quantity: 2 },
@@ -456,6 +463,7 @@ const app = express();
             gate: d.gate || "",
             shopName: d.shop_name || "",
             signboardUrl: d.signboard_url || "",
+            paymentMethod: d.payment_method || "",
             tableNumber: d.table_number,
             phoneNumber: d.phone_number || "",
             totalPrice: Number(d.total_price),
@@ -485,6 +493,7 @@ const app = express();
         gate: o.gate || "",
         shop_name: o.shopName || "",
         signboard_url: o.signboardUrl || "",
+        payment_method: o.paymentMethod || "",
         table_number: o.tableNumber,
         phone_number: o.phoneNumber || "",
         total_price: o.totalPrice,
@@ -1112,7 +1121,7 @@ const app = express();
   // Create a new order
   app.post("/api/orders", async (req, res) => {
     try {
-      const { customerName, floor, gate, shopName, signboardUrl, phoneNumber, items, salesPerson, status, redeemReward, redeemType } = req.body;
+      const { customerName, floor, gate, shopName, signboardUrl, paymentMethod, phoneNumber, items, salesPerson, status, redeemReward, redeemType } = req.body;
 
       if (!customerName || !items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: "Missing required fields: customerName, items" });
@@ -1131,6 +1140,11 @@ const app = express();
       }
       if (!cleanShopName) {
         return res.status(400).json({ error: "Please enter your shop name." });
+      }
+
+      const cleanPaymentMethod = String(paymentMethod || "").trim().toLowerCase();
+      if (!PAYMENT_METHODS[cleanPaymentMethod]) {
+        return res.status(400).json({ error: "Please choose how you are paying: Cash or Card (Mada)." });
       }
 
       const deliveryLabel = formatDeliveryLabel(cleanFloor, cleanGate, cleanShopName);
@@ -1267,6 +1281,7 @@ const app = express();
         gate: cleanFloor === "1" ? cleanGate : "",
         shopName: cleanShopName,
         signboardUrl: signboardUrl || "",
+        paymentMethod: cleanPaymentMethod,
         tableNumber: deliveryLabel,
         phoneNumber: phoneNumber || "",
         items,
@@ -1328,7 +1343,7 @@ const app = express();
   app.get("/api/export-sheets", async (req, res) => {
     try {
       const activeOrders = await getOrdersListFromSupabase();
-      let csvContent = "Order ID,Customer Name,Floor,Gate,Shop Name,Signboard Photo,Destination,Contact,Status,Created At,Total Price,Items,Salesperson\n";
+      let csvContent = "Order ID,Customer Name,Floor,Gate,Shop Name,Signboard Photo,Destination,Payment Method,Contact,Status,Created At,Total Price,Items,Salesperson\n";
 
       const csv = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;
 
@@ -1344,6 +1359,7 @@ const app = express();
           csv(order.shopName),
           csv(order.signboardUrl),
           csv(order.tableNumber),
+          csv(PAYMENT_METHODS[order.paymentMethod] || ""),
           csv(order.phoneNumber || ""),
           csv(order.status),
           csv(cleanedDate),
