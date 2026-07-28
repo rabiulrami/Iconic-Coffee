@@ -17,6 +17,10 @@
   --color-line: #E5DAC7;       /* hairline on paper          */
   --color-accent: #9A5A2C;     /* copper - the single accent */
   --color-accent-deep: #7C451F;/* copper pressed / hover     */
+  /* Copper is only 3.3:1 on the espresso surfaces, under the 4.5 AA wants for
+     body text. This lighter tone is the same hue at 6.2:1 - use it for accent
+     TEXT on dark; plain --color-accent still owns fills and borders. */
+  --color-accent-on-dark: #C98A52;
   --color-cream: #F2E9DA;      /* text/ivory on dark surface */
   --color-cream-muted: #C4B3A0;/* muted text on dark surface */
 }

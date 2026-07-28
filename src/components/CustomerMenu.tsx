@@ -28,10 +28,14 @@ import {
   Camera,
   Banknote,
   CreditCard,
-  MoreVertical,
-  ArrowUp
+  Menu,
+  ArrowUp,
+  Info,
+  MapPin,
+  Clock
 } from 'lucide-react';
 import PromoCarousel from './PromoCarousel';
+import { searchItems } from '../lib/search';
 import { CATEGORIES, MENU_ITEMS, Category, MenuItem } from '../data';
 import MenuImage from './MenuImage';
 
@@ -164,8 +168,9 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   // The page itself does not scroll (an ancestor does), so "back to top" needs an anchor.
   const topRef = useRef<HTMLDivElement>(null);
 
-  // Three-dot quick navigation
+  // Hamburger navigation and the About Us sheet it opens
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
 
   // Selected loyalty reward products (up to 3)
   const [loyaltyRewardProductIds, setLoyaltyRewardProductIds] = useState<string[]>([]);
@@ -585,16 +590,15 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     scrollToSection(listContainerRef);
   };
 
-  // Filter items in real time based on active category tabs and search bars
-  const displayItems = menuItems.filter(it => {
-    const belongsToCategory = activeCategory === 'all' || it.category === activeCategory;
-    const matchesSearch = searchQuery.trim() === '' || 
-      it.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      it.nameAr.includes(searchQuery) ||
-      (it.descriptionEn && it.descriptionEn.toLowerCase().includes(searchQuery.toLowerCase()));
+  const isSearching = searchQuery.trim() !== '';
 
-    return belongsToCategory && matchesSearch;
-  });
+  // A search runs across the whole menu, not just the open category — someone typing
+  // "juice" while Specials happens to be selected means to find the juices. Without a
+  // query we are back to plain category browsing.
+  const displayItems = useMemo(() => {
+    if (isSearching) return searchItems(searchQuery, menuItems);
+    return menuItems.filter(it => activeCategory === 'all' || it.category === activeCategory);
+  }, [isSearching, searchQuery, menuItems, activeCategory]);
 
   return (
     <div className="min-h-screen bg-paper text-ink flex flex-col antialiased relative">
@@ -633,12 +637,12 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
             onClick={() => setIsQuickMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={isQuickMenuOpen}
-            aria-label="Quick navigation"
+            aria-label="Menu"
             className={`p-2 rounded-full active:scale-95 transition-all cursor-pointer ${
               isQuickMenuOpen ? 'text-accent bg-paper-2' : 'text-faint hover:text-accent hover:bg-paper-2'
             }`}
           >
-            <MoreVertical className="w-[18px] h-[18px]" strokeWidth={1.8} />
+            <Menu className="w-[18px] h-[18px]" strokeWidth={1.8} />
           </button>
 
           {isQuickMenuOpen && (
@@ -648,12 +652,13 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                 className="fixed inset-0 z-40"
                 onClick={() => setIsQuickMenuOpen(false)}
               />
+              {/* Dark panel: text-only, high contrast against the ivory page behind it */}
               <div
                 role="menu"
-                className="absolute left-0 top-[calc(100%+8px)] z-50 w-60 bg-card border border-line rounded-2xl shadow-lift overflow-hidden animate-fadeIn"
+                className="absolute left-0 top-[calc(100%+8px)] z-50 w-60 bg-espresso border border-white/10 rounded-2xl shadow-lift overflow-hidden animate-fadeIn"
               >
-                <div className="px-4 pt-3 pb-2">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-faint font-sans font-semibold">Go to</p>
+                <div className="px-4 pt-3.5 pb-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-cream-muted font-sans font-bold">Go to</p>
                 </div>
 
                 {activeOrderId && activeOrder && (
@@ -661,10 +666,10 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                     type="button"
                     role="menuitem"
                     onClick={() => { setIsQuickMenuOpen(false); setIsTrackingOpen(true); }}
-                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
                   >
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-accent animate-livedot shrink-0" />
-                    <span className="text-[13px] font-medium text-ink">Track my order</span>
+                    <span className="text-[14px] font-semibold text-cream">Track my order</span>
                   </button>
                 )}
 
@@ -672,59 +677,89 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   type="button"
                   role="menuitem"
                   onClick={() => { setIsQuickMenuOpen(false); scrollToSection(searchRef); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
                 >
-                  <Search className="w-4 h-4 text-accent shrink-0" strokeWidth={1.7} />
-                  <span className="text-[13px] font-medium text-ink">Search the menu</span>
+                  <Search className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+                  <span className="text-[14px] font-semibold text-cream">Search the menu</span>
                 </button>
 
-                <div className="max-h-56 overflow-y-auto border-y border-line my-1 py-1">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => { setIsQuickMenuOpen(false); handleSelectCategory(cat.id); }}
-                      className={`w-full px-4 py-2 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer ${
-                        activeCategory === cat.id ? 'bg-paper-2' : ''
-                      }`}
-                    >
-                      <img
-                        src={cat.image}
-                        alt=""
-                        loading="lazy"
-                        onError={(e) => {
-                          const el = e.currentTarget as HTMLImageElement;
-                          if (el.src !== cat.imageFallback) el.src = cat.imageFallback;
-                        }}
-                        className="w-6 h-6 rounded-lg object-cover shrink-0 ring-1 ring-line"
-                      />
-                      <span className={`text-[13px] ${activeCategory === cat.id ? 'text-ink font-semibold' : 'text-muted font-medium'}`}>
-                        {cat.nameEn}
-                      </span>
-                    </button>
-                  ))}
+                <div className="border-y border-white/10 my-1 py-1">
+                  {CATEGORIES.map((cat) => {
+                    const active = activeCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setIsQuickMenuOpen(false); handleSelectCategory(cat.id); }}
+                        className={`w-full pl-4 pr-4 py-2 flex items-center justify-between gap-2 text-left transition cursor-pointer border-l-2 ${
+                          active
+                            ? 'bg-white/10 border-accent'
+                            : 'border-transparent hover:bg-white/10 hover:border-accent/50'
+                        }`}
+                      >
+                        <span className={`text-[14px] ${active ? 'text-cream font-bold' : 'text-cream/90 font-semibold'}`}>
+                          {cat.nameEn}
+                        </span>
+                        <span className="text-[12px] text-cream-muted font-serif font-bold shrink-0" dir="rtl">
+                          {cat.nameAr}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <button
                   type="button"
                   role="menuitem"
                   onClick={() => { setIsQuickMenuOpen(false); scrollToSection(loyaltyRef); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
                 >
-                  <Award className="w-4 h-4 text-accent shrink-0" strokeWidth={1.7} />
-                  <span className="text-[13px] font-medium text-ink">Loyalty & rewards</span>
+                  <Award className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+                  <span className="text-[14px] font-semibold text-cream">Loyalty & rewards</span>
                 </button>
 
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => { setIsQuickMenuOpen(false); scrollToSection(topRef); }}
-                  className="w-full px-4 py-2.5 mb-1 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                  onClick={() => { setIsQuickMenuOpen(false); setIsAboutOpen(true); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
                 >
-                  <ArrowUp className="w-4 h-4 text-accent shrink-0" strokeWidth={1.7} />
-                  <span className="text-[13px] font-medium text-ink">Back to top</span>
+                  <Info className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+                  <span className="text-[14px] font-semibold text-cream">About us</span>
                 </button>
+
+                <a
+                  role="menuitem"
+                  href="tel:+966500000000"
+                  onClick={() => setIsQuickMenuOpen(false)}
+                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+                >
+                  <PhoneCall className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+                  <span className="text-[14px] font-semibold text-cream">Call the shop</span>
+                </a>
+
+                <div className="border-t border-white/10 mt-1 pt-1 pb-1">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setIsQuickMenuOpen(false); scrollToSection(topRef); }}
+                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <ArrowUp className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+                    <span className="text-[14px] font-semibold text-cream">Back to top</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setIsQuickMenuOpen(false); onGoToAdmin(); }}
+                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <Shield className="w-4 h-4 text-cream-muted shrink-0" strokeWidth={2} />
+                    <span className="text-[14px] font-semibold text-cream-muted">Staff portal</span>
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -867,17 +902,17 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
                     <div className="p-3.5 text-cream flex-1 flex flex-col justify-between">
                       <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-[12px] font-serif font-semibold text-cream leading-tight line-clamp-2">{item.nameEn}</h4>
-                          <span className="text-[12px] text-cream-muted font-serif shrink-0">{item.nameAr}</span>
-                        </div>
-                        <p className="text-[10px] text-cream-muted font-sans mt-1.5 leading-snug line-clamp-2 h-7 overflow-hidden">
+                        <h4 className="text-[12.5px] font-serif font-semibold text-cream leading-snug break-words">{item.nameEn}</h4>
+                        <p dir="rtl" lang="ar" className="text-[12.5px] font-serif font-bold text-cream/90 leading-snug mt-1 break-words text-right">
+                          {item.nameAr}
+                        </p>
+                        <p className="text-[10px] text-cream-muted font-sans mt-1.5 leading-snug line-clamp-2 overflow-hidden">
                           {item.descriptionEn}
                         </p>
                       </div>
 
                       <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
-                        <div className="text-[13px] font-mono text-accent">
+                        <div className="text-[13.5px] font-mono font-semibold text-accent-on-dark">
                           SR {item.price}
                         </div>
                         <button
@@ -902,18 +937,38 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           {/* Dynamic Active Title */}
           <div className="flex items-baseline gap-2.5">
             <h3 className="text-[22px] font-serif font-semibold text-ink leading-none">
-              {CATEGORIES.find(c => c.id === activeCategory)?.nameEn || 'Menu'}
+              {isSearching
+                ? `${displayItems.length} result${displayItems.length === 1 ? '' : 's'}`
+                : CATEGORIES.find(c => c.id === activeCategory)?.nameEn || 'Menu'}
             </h3>
             <span className="text-[13px] text-faint font-serif">
-              {CATEGORIES.find(c => c.id === activeCategory)?.nameAr || 'قائمة'}
+              {isSearching
+                ? `for "${searchQuery.trim()}"`
+                : CATEGORIES.find(c => c.id === activeCategory)?.nameAr || 'قائمة'}
             </span>
           </div>
 
           {/* Catalog grid */}
           {displayItems.length === 0 ? (
-            <div className="py-16 text-center text-[13px] text-muted font-serif">
+            <div className="py-16 text-center text-[13px] text-muted font-serif px-6">
               <Coffee className="w-9 h-9 text-line mx-auto mb-3" strokeWidth={1.2} />
-              Nothing matches your search.
+              {isSearching ? (
+                <>
+                  <p className="text-ink font-semibold text-[14px]">No match for "{searchQuery.trim()}"</p>
+                  <p className="mt-1.5 font-sans text-[12px] text-muted">
+                    Try a shorter word, or browse the categories above.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="mt-4 px-5 py-2.5 bg-espresso hover:bg-ink text-cream text-[12.5px] font-medium rounded-full transition cursor-pointer"
+                  >
+                    Clear search
+                  </button>
+                </>
+              ) : (
+                'Nothing here yet.'
+              )}
             </div>
           ) : (
              <div className="grid grid-cols-2 gap-3">
@@ -922,66 +977,75 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                  return (
                  <div
                    key={item.id}
-                   className="bg-card rounded-2xl overflow-hidden shadow-soft transition-all duration-300 flex flex-col relative group border border-line/70"
+                   className="bg-espresso rounded-2xl overflow-hidden shadow-soft transition-all duration-300 flex flex-col relative group border border-line/70"
                  >
-                   {/* Product image on a soft ivory field */}
-                   <div className="pt-5 pb-4 flex justify-center bg-paper relative">
-                     <div className="w-24 h-24 rounded-full bg-card flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.04] overflow-hidden">
+                   {/* Product image stays on a soft ivory field above the dark body */}
+                   <div className="pt-5 pb-4 flex justify-center bg-card relative">
+                     <div className="w-24 h-24 rounded-full bg-paper flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.04] overflow-hidden">
                        <MenuImage itemId={item.id} category={item.category} className="w-[84px] h-[84px] rounded-full object-cover" image={item.image} />
                      </div>
                      {item.isSpecial && (
-                       <span className="absolute top-3 left-3 bg-accent/10 text-accent border border-accent/20 text-[9px] px-2 py-0.5 rounded-full font-medium tracking-wide">
+                       <span className="absolute top-3 left-3 bg-accent/12 text-accent border border-accent/25 text-[9px] px-2 py-0.5 rounded-full font-semibold tracking-wide">
                          Signature
                        </span>
                      )}
                    </div>
 
-                   {/* Body */}
-                   <div className="px-3.5 pt-3 pb-3.5 flex-1 flex flex-col justify-between select-none">
+                   {/* Body on a dark field so the names carry at a glance, matching the
+                       specials rail. Cream on espresso clears WCAG AA comfortably. */}
+                   <div className="px-3.5 pt-3 pb-3.5 flex-1 flex flex-col justify-between select-none bg-espresso">
+                     {/* Names stack: side-by-side truncated the Arabic on narrow phones,
+                         so each name now owns its full line and wraps instead of clipping. */}
                      <div>
-                       <div className="flex items-start justify-between gap-2">
-                         <h4 className="text-[13px] font-serif font-semibold text-ink leading-tight line-clamp-2" title={item.nameEn}>
-                           {item.nameEn}
-                         </h4>
-                         <span className="text-[12px] text-muted font-serif shrink-0 mt-0.5">
-                           {item.nameAr}
-                         </span>
-                       </div>
+                       <h4
+                         className="text-[13.5px] font-serif font-bold text-cream leading-snug break-words hyphens-auto"
+                         title={item.nameEn}
+                       >
+                         {item.nameEn}
+                       </h4>
+                       <p
+                         dir="rtl"
+                         lang="ar"
+                         className="text-[13.5px] font-serif font-bold text-cream/95 leading-snug mt-1 break-words text-right"
+                         title={item.nameAr}
+                       >
+                         {item.nameAr}
+                       </p>
                        {item.descriptionEn && (
-                         <p className="text-[10.5px] text-muted/80 font-sans leading-snug line-clamp-2 mt-1.5 h-7 overflow-hidden">
+                         <p className="text-[10.5px] text-cream-muted font-sans leading-snug line-clamp-2 mt-1.5 overflow-hidden">
                            {item.descriptionEn}
                          </p>
                        )}
                      </div>
 
-                     <div className="mt-3 pt-3 border-t border-line flex items-center justify-between gap-2">
-                       <div className="text-[14px] font-mono text-accent shrink-0">
+                     <div className="mt-3 pt-3 border-t border-white/12 flex items-center justify-between gap-2">
+                       <div className="text-[14px] font-mono font-semibold text-accent-on-dark shrink-0">
                          SR {item.price}
                        </div>
                        <div className="shrink-0">
                          {inCart ? (
-                           <div className="flex items-center gap-1 bg-paper-2 rounded-full p-0.5 border border-line">
+                           <div className="flex items-center gap-1 bg-white/10 rounded-full p-0.5 border border-white/15">
                              <button
                                type="button"
                                onClick={() => updateQuantity(item.id, -1)}
-                               className="w-6 h-6 flex items-center justify-center hover:bg-card active:scale-95 rounded-full transition text-ink cursor-pointer"
+                               className="w-6 h-6 flex items-center justify-center hover:bg-white/15 active:scale-95 rounded-full transition text-cream cursor-pointer"
                              >
-                               <Minus className="w-3 h-3" strokeWidth={2} />
+                               <Minus className="w-3 h-3" strokeWidth={2.5} />
                              </button>
-                             <span className="text-[12px] font-mono font-semibold text-ink w-4 text-center">{inCart.quantity}</span>
+                             <span className="text-[12px] font-mono font-bold text-cream w-4 text-center">{inCart.quantity}</span>
                              <button
                                type="button"
                                onClick={() => updateQuantity(item.id, 1)}
-                               className="w-6 h-6 flex items-center justify-center hover:bg-card active:scale-95 rounded-full transition text-ink cursor-pointer"
+                               className="w-6 h-6 flex items-center justify-center hover:bg-white/15 active:scale-95 rounded-full transition text-cream cursor-pointer"
                              >
-                               <Plus className="w-3 h-3" strokeWidth={2} />
+                               <Plus className="w-3 h-3" strokeWidth={2.5} />
                              </button>
                            </div>
                          ) : (
                            <button
                              type="button"
                              onClick={() => handleAddToCart(item)}
-                             className="bg-espresso hover:bg-ink active:scale-95 text-cream font-sans text-[11px] font-medium py-1.5 px-4 rounded-full transition cursor-pointer whitespace-nowrap"
+                             className="bg-accent hover:bg-accent-deep active:scale-95 text-cream font-sans text-[11.5px] font-semibold py-1.5 px-4 rounded-full transition cursor-pointer whitespace-nowrap"
                            >
                              Add
                            </button>
@@ -1057,7 +1121,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                     <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={2} />
                     <div>
                       <p className="font-semibold text-cream">Your reward is ready</p>
-                      <p className="text-[11px] text-cream-muted leading-relaxed mt-0.5">Use <span className="text-accent font-medium">{checkedProfile.identifier}</span> at checkout and toggle your reward.</p>
+                      <p className="text-[11px] text-cream-muted leading-relaxed mt-0.5">Use <span className="text-accent-on-dark font-semibold">{checkedProfile.identifier}</span> at checkout and toggle your reward.</p>
                     </div>
                   </div>
                 ) : (
@@ -1121,10 +1185,10 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                         </div>
 
                         <div className="select-text flex-1 min-w-0">
-                          <h4 className="text-[13px] font-serif font-semibold text-ink leading-snug break-words">
+                          <h4 className="text-[13.5px] font-serif font-bold text-ink leading-snug break-words">
                             {prod.nameEn}
                           </h4>
-                          <span className="text-[12px] text-muted font-serif block leading-normal">
+                          <span dir="rtl" lang="ar" className="text-[13px] text-ink font-serif font-bold block leading-snug break-words text-right mt-0.5">
                             {prod.nameAr}
                           </span>
                           <div className="mt-1 font-mono text-[11px]">
@@ -1238,20 +1302,22 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                       key={c.id}
                       className="p-3 bg-card border border-line rounded-xl flex items-center justify-between gap-3"
                     >
-                      <div className="flex items-center gap-3 truncate">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="w-11 h-11 rounded-lg bg-paper border border-line flex-shrink-0 flex items-center justify-center">
                           <MenuImage itemId={c.id} category={c.category} className="w-8 h-8" image={c.image} />
                         </div>
-                        <div className="truncate text-left">
-                          <h4 className="text-[13px] font-serif font-semibold text-ink truncate flex items-center gap-1.5">
-                            {c.nameEn}
+                        <div className="min-w-0 text-left">
+                          <h4 className="text-[13.5px] font-serif font-bold text-ink leading-snug break-words flex items-start gap-1.5">
+                            <span className="min-w-0">{c.nameEn}</span>
                             {c.isLoyaltyFree && (
-                              <span className="px-1.5 py-0.5 text-[9px] font-medium bg-accent/12 text-accent rounded shrink-0">
+                              <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-accent/12 text-accent rounded shrink-0 mt-0.5">
                                 Gift
                               </span>
                             )}
                           </h4>
-                          <h4 className="text-[11px] text-muted font-serif text-left truncate">{c.nameAr}</h4>
+                          <p dir="rtl" lang="ar" className="text-[12.5px] font-serif font-bold text-ink leading-snug break-words text-right mt-0.5">
+                            {c.nameAr}
+                          </p>
                         </div>
                       </div>
 
@@ -1681,6 +1747,93 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   {isCheckoutLoading ? "Placing your order…" : "Place order"}
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- ABOUT US SHEET --- */}
+      {isAboutOpen && (
+        <div
+          className="fixed inset-0 bg-espresso/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setIsAboutOpen(false)}
+        >
+          <div
+            className="bg-paper w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-lift flex flex-col max-h-[88vh] overflow-hidden text-ink animate-slideUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-line flex items-center justify-between bg-card">
+              <h3 className="font-serif font-semibold text-[19px] text-ink leading-none">About us</h3>
+              <button
+                type="button"
+                onClick={() => setIsAboutOpen(false)}
+                className="p-2 hover:bg-paper-2 rounded-full transition text-muted hover:text-ink cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" strokeWidth={1.7} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5 space-y-5">
+              <div className="flex flex-col items-center text-center gap-2.5 pb-1">
+                <div className="w-14 h-14 rounded-full border border-accent/30 flex items-center justify-center bg-card">
+                  <span className="font-serif text-[21px] font-semibold tracking-[0.15em] text-accent leading-none pl-[3px]">IC</span>
+                </div>
+                <div>
+                  <p className="font-serif text-[20px] font-semibold tracking-[0.12em] uppercase text-ink">Iconic Coffee</p>
+                  <p className="text-[11px] tracking-[0.24em] font-medium text-faint font-sans uppercase mt-1">Roastery</p>
+                </div>
+              </div>
+
+              <p className="text-[13px] leading-relaxed text-muted font-sans text-center">
+                Specialty beans, roasted in-house and pulled fresh to order, alongside a
+                bakery counter we bake through the day. We deliver straight to your shop
+                inside the mall.
+              </p>
+              <p className="text-[12.5px] leading-relaxed text-muted font-serif text-center" dir="rtl">
+                قهوة مختصة محمصة لدينا وحلويات طازجة، نوصلها مباشرة إلى محلك داخل المركز.
+              </p>
+
+              <div className="space-y-2.5 pt-1">
+                <div className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl">
+                  <MapPin className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={1.7} />
+                  <div>
+                    <p className="text-[12.5px] font-medium text-ink">Where we are</p>
+                    <p className="text-[11.5px] text-muted leading-relaxed mt-0.5">
+                      Ground floor, beside the main atrium. We deliver to both floors.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl">
+                  <Clock className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={1.7} />
+                  <div>
+                    <p className="text-[12.5px] font-medium text-ink">Opening hours</p>
+                    <p className="text-[11.5px] text-muted leading-relaxed mt-0.5">
+                      Daily, 9:00 am to 12:00 am
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href="tel:+966500000000"
+                  className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl hover:border-accent/40 transition"
+                >
+                  <PhoneCall className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={1.7} />
+                  <div>
+                    <p className="text-[12.5px] font-medium text-ink">Talk to us</p>
+                    <p className="text-[11.5px] text-muted leading-relaxed mt-0.5 font-mono">+966 50 000 0000</p>
+                  </div>
+                </a>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setIsAboutOpen(false); handleSelectCategory('specials'); }}
+                className="w-full bg-accent hover:bg-accent-deep text-cream py-3 font-medium rounded-full transition text-[13.5px] cursor-pointer active:scale-[0.99]"
+              >
+                See today's specials
+              </button>
             </div>
           </div>
         </div>

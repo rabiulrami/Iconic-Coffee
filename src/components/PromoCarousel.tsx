@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CATEGORIES, PROMO_BANNERS, PromoBanner } from '../data';
 
 interface PromoCarouselProps {
@@ -7,17 +6,87 @@ interface PromoCarouselProps {
   onSelectCategory: (categoryId: string) => void;
 }
 
+const AUTOPLAY_MS = 3800;
+/** How long to leave autoplay alone after the customer swipes or drags. */
+const RESUME_AFTER_MS = 6000;
+
 /**
- * Swipeable showcase of the branded category artwork.
+ * Auto-advancing showcase of the branded category artwork.
  *
- * Every banner always renders. Where the wide artwork is missing the tile falls back
- * to that category's square photo with the name laid over it, so the card is complete
- * from the first paint instead of flashing in and collapsing as images fail. Dropping
- * a file into public/banners/ upgrades its tile with no code change.
+ * Advances one card at a time and can still be swiped by hand; a manual swipe
+ * suspends autoplay briefly, then it picks up again from wherever the customer
+ * left it. Every banner always renders — where the wide artwork is missing the tile
+ * falls back to that category's square photo with the name laid over it, so the card
+ * is complete on first paint and can never collapse to nothing.
  */
 export default function PromoCarousel({ onSelectCategory }: PromoCarouselProps) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [index, setIndex] = useState(0);
   // Slugs whose wide artwork failed both the bundled path and the CDN copy.
   const [noArtwork, setNoArtwork] = useState<string[]>([]);
+  // Set while the customer is interacting; cleared RESUME_AFTER_MS after they stop.
+  const [suspended, setSuspended] = useState(false);
+  const resumeTimer = useRef<number | null>(null);
+
+  const count = PROMO_BANNERS.length;
+
+  const scrollToIndex = useCallback((i: number, smooth = true) => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const card = rail.children[0]?.children[i] as HTMLElement | undefined;
+    if (!card) return;
+    rail.scrollTo({ left: card.offsetLeft - rail.offsetLeft, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
+  // Hold autoplay off while the customer is driving, then hand it back.
+  const suspendAutoplay = useCallback(() => {
+    setSuspended(true);
+    if (resumeTimer.current) window.clearTimeout(resumeTimer.current);
+    resumeTimer.current = window.setTimeout(() => setSuspended(false), RESUME_AFTER_MS);
+  }, []);
+
+  useEffect(() => () => {
+    if (resumeTimer.current) window.clearTimeout(resumeTimer.current);
+  }, []);
+
+  // Autoplay. Only reduced-motion opts out.
+  //
+  // Deliberately not gated on document.hidden: this menu runs inside an iframe wrapper
+  // and is opened from a QR code in in-app webviews, and those contexts can report
+  // hidden for the whole session — which would leave the carousel frozen on card one
+  // for every customer. Browsers already throttle timers in background tabs, and an
+  // idle scroll costs nothing, so the guard bought little and risked a lot.
+  useEffect(() => {
+    if (suspended) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const id = window.setInterval(() => {
+      setIndex((prev) => {
+        const next = (prev + 1) % count;
+        scrollToIndex(next);
+        return next;
+      });
+    }, AUTOPLAY_MS);
+    return () => window.clearInterval(id);
+  }, [suspended, count, scrollToIndex]);
+
+  // Keep the dots honest when the customer swipes by hand.
+  const handleScroll = () => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const track = rail.children[0] as HTMLElement | undefined;
+    if (!track) return;
+    const cards = Array.from(track.children) as HTMLElement[];
+    const mid = rail.scrollLeft + rail.clientWidth / 2;
+    let closest = 0;
+    let best = Infinity;
+    cards.forEach((c, i) => {
+      const centre = c.offsetLeft - rail.offsetLeft + c.offsetWidth / 2;
+      const d = Math.abs(centre - mid);
+      if (d < best) { best = d; closest = i; }
+    });
+    setIndex(closest);
+  };
 
   const renderTile = (banner: PromoBanner) => {
     const usingFallback = noArtwork.includes(banner.slug);
@@ -29,7 +98,7 @@ export default function PromoCarousel({ onSelectCategory }: PromoCarouselProps) 
         type="button"
         onClick={() => onSelectCategory(banner.category)}
         aria-label={`Browse ${banner.label}`}
-        className="relative shrink-0 snap-start w-[268px] aspect-[3/2] rounded-2xl overflow-hidden ring-1 ring-line bg-paper-2 cursor-pointer transition-transform duration-200 active:scale-[0.98] hover:ring-accent/40"
+        className="relative shrink-0 snap-center w-[268px] aspect-[3/2] rounded-2xl overflow-hidden ring-1 ring-line bg-paper-2 cursor-pointer transition-transform duration-200 active:scale-[0.98] hover:ring-accent/40"
       >
         <img
           src={usingFallback ? (category?.image ?? banner.image) : banner.image}
@@ -72,18 +141,40 @@ export default function PromoCarousel({ onSelectCategory }: PromoCarouselProps) 
       <div className="px-5 pt-4 pb-3 flex items-baseline justify-between gap-3">
         <div>
           <h3 className="font-serif text-[20px] leading-tight font-semibold text-ink">The Iconic Range</h3>
-          <p className="text-[11.5px] text-muted font-sans mt-0.5 flex items-center gap-1">
-            Swipe, then tap to jump
-            <ArrowRight className="w-3 h-3 text-accent" strokeWidth={1.8} />
-          </p>
+          <p className="text-[11.5px] text-muted font-sans mt-0.5">Tap any one to jump straight to it</p>
         </div>
         <span className="text-[13px] text-faint font-serif shrink-0">تشكيلتنا</span>
       </div>
 
-      <div className="overflow-x-auto scrollbar-none snap-x snap-mandatory pb-5">
+      <div
+        ref={railRef}
+        onScroll={handleScroll}
+        onPointerDown={suspendAutoplay}
+        onTouchStart={suspendAutoplay}
+        onWheel={suspendAutoplay}
+        onMouseEnter={() => setSuspended(true)}
+        onMouseLeave={suspendAutoplay}
+        className="overflow-x-auto scrollbar-none snap-x snap-mandatory"
+      >
         <div className="flex gap-3 px-5 w-max">
           {PROMO_BANNERS.map(renderTile)}
         </div>
+      </div>
+
+      {/* Position dots double as jump targets */}
+      <div className="flex items-center justify-center gap-1.5 py-3.5">
+        {PROMO_BANNERS.map((b, i) => (
+          <button
+            key={b.slug}
+            type="button"
+            aria-label={`Show ${b.label}`}
+            aria-current={i === index}
+            onClick={() => { suspendAutoplay(); setIndex(i); scrollToIndex(i); }}
+            className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+              i === index ? 'w-5 bg-accent' : 'w-1.5 bg-line hover:bg-faint'
+            }`}
+          />
+        ))}
       </div>
     </section>
   );
