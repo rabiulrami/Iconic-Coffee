@@ -858,10 +858,11 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                 >
                   {renderCatIcon(cat)}
                 </span>
-                {/* Fixed two-line box keeps every tile on the same baseline */}
+                {/* Fixed two-line box keeps every tile on the same baseline.
+                    Height must track the font size or the second line clips. */}
                 <span
-                  className={`text-[11px] leading-[1.3] text-center font-sans h-[29px] px-0.5 transition-colors ${
-                    active ? 'text-ink font-semibold' : 'text-muted font-medium group-hover:text-ink'
+                  className={`text-[12.5px] leading-[1.3] text-center font-sans h-[33px] px-0.5 transition-colors ${
+                    active ? 'text-ink font-bold' : 'text-muted font-semibold group-hover:text-ink'
                   }`}
                 >
                   {cat.nameEn}
