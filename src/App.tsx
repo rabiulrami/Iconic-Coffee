@@ -173,12 +173,16 @@ export default function App() {
           <AdminSheet currentUser={currentUser} onBackToMenu={handleBackToMenu} />
         ) : (
           /* For customer menu */
-          <div className="flex-1 bg-[#ECE9E4] flex items-center justify-center relative py-4 sm:py-8 overflow-y-auto">
+          <div className="flex-1 bg-[#ECE9E4] flex items-center justify-center relative py-0 sm:py-8 overflow-y-auto">
             {/* Desktop Background coffee beans vectors decoration */}
             <div className="absolute inset-0 opacity-5 pointer-events-none select-none bg-[radial-gradient(#9C5D30_1.5px,transparent_1.5px)] [background-size:16px_16px]" />
 
-            {/* Smart Frame Wrappers */}
-            <div className="w-full max-w-md bg-white shadow-2xl overflow-hidden sm:rounded-[40px] sm:border-[12px] sm:border-zinc-900 sm:aspect-[9/19] sm:max-h-[880px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] relative flex flex-col transition-all duration-300">
+            {/* Smart Frame Wrappers.
+                On phones the frame is pinned to the viewport so the inner div below is
+                the real scroll container — without a height cap it grows to fit its
+                content, the page scrolls instead, and `sticky` inside the menu (the
+                header holding the quick-route and staff buttons) never engages. */}
+            <div className="w-full max-w-md h-[100dvh] sm:h-auto bg-white shadow-2xl overflow-hidden sm:rounded-[40px] sm:border-[12px] sm:border-zinc-900 sm:aspect-[9/19] sm:max-h-[880px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] relative flex flex-col transition-all duration-300">
               
               {/* Optional Phone Notch decoration */}
               <div className="hidden sm:block absolute top-0 inset-x-0 h-6 bg-zinc-900 rounded-b-xl z-50 flex items-center justify-center">

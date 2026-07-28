@@ -32,6 +32,39 @@ const categoryImage = (slug: string) => ({
   imageFallback: `${CATEGORY_IMAGE_CDN}/${slug}.jpg`,
 });
 
+// Wide promo artwork for the auto-scrolling showcase card. `category` is the menu
+// filter a tap applies; several banners can point at the same category (Matcha and
+// Milk Shakes both live under 'matcha').
+export interface PromoBanner {
+  slug: string;
+  label: string;
+  category: string;
+  image: string;
+  imageFallback: string;
+}
+
+export const PROMO_BANNER_CDN =
+  'https://aaetqwwpsigcuwyuhlvy.supabase.co/storage/v1/object/public/menu-assets/banners';
+
+const promoBanner = (slug: string, label: string, category: string): PromoBanner => ({
+  slug,
+  label,
+  category,
+  image: `/banners/${slug}.webp`,
+  imageFallback: `${PROMO_BANNER_CDN}/${slug}.jpg`,
+});
+
+export const PROMO_BANNERS: PromoBanner[] = [
+  promoBanner('specials', 'Iconic Special', 'specials'),
+  promoBanner('sweet', 'Sweet Items', 'sweet'),
+  promoBanner('boba', 'Boba Drinks', 'boba'),
+  promoBanner('cold', 'Cold Drinks', 'cold'),
+  promoBanner('matcha', 'Matcha Drinks', 'matcha'),
+  promoBanner('milkshake', 'Milk Shakes', 'matcha'),
+  promoBanner('juice', 'Juice Drinks', 'juice'),
+  promoBanner('hot', 'Hot Drinks', 'hot'),
+];
+
 export const CATEGORIES: Category[] = [
   { id: 'specials', nameEn: 'Specials', nameAr: 'المميزة', icon: 'Sparkles', ...categoryImage('specials') },
   { id: 'sweet', nameEn: 'Sweet', nameAr: 'حلويات', icon: 'CakeSlice', ...categoryImage('sweet') },

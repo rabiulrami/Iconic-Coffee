@@ -80,12 +80,41 @@
 .animate-shake { animation: ic-shake 0.4s ease-in-out both; }
 .animate-livedot { animation: ic-pulse-dot 1.8s ease-in-out infinite; }
 
+/* Seamless promo marquee. The track carries two copies of the banner list and
+   travels exactly one copy's width, so the loop point is invisible. */
+@keyframes ic-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.promo-marquee {
+  overflow: hidden;
+}
+.promo-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: ic-marquee linear infinite;
+  will-change: transform;
+}
+/* Spacing lives on the items, not on `gap`/padding: each item must occupy exactly
+   width + spacing so that half the track equals one whole copy of the list. Any
+   container padding or a trailing `gap` would offset the loop and show a jump. */
+.promo-marquee-track > * {
+  margin-right: 12px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fadeIn,
   .animate-slideUp,
   .animate-shake,
   .animate-livedot {
     animation: none !important;
+  }
+  /* Stop the marquee and leave it as a plain swipeable rail. */
+  .promo-marquee-track {
+    animation: none !important;
+  }
+  .promo-marquee {
+    overflow-x: auto;
   }
   * {
     transition-duration: 0.01ms !important;

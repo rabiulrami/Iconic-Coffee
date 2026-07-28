@@ -27,8 +27,11 @@ import {
   Store,
   Camera,
   Banknote,
-  CreditCard
+  CreditCard,
+  MoreVertical,
+  ArrowUp
 } from 'lucide-react';
+import PromoCarousel from './PromoCarousel';
 import { CATEGORIES, MENU_ITEMS, Category, MenuItem } from '../data';
 import MenuImage from './MenuImage';
 
@@ -154,8 +157,15 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(0);
   
-  // Selected category ref for smooth scrolling
+  // Scroll targets for the quick-route menu and the category grid
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const loyaltyRef = useRef<HTMLDivElement>(null);
+  // The page itself does not scroll (an ancestor does), so "back to top" needs an anchor.
+  const topRef = useRef<HTMLDivElement>(null);
+
+  // Three-dot quick navigation
+  const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
 
   // Selected loyalty reward products (up to 3)
   const [loyaltyRewardProductIds, setLoyaltyRewardProductIds] = useState<string[]>([]);
@@ -562,12 +572,17 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     );
   };
 
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   // Picking a category from the grid drops the customer straight onto the products
   const handleSelectCategory = (categoryId: string) => {
     setActiveCategory(categoryId);
-    requestAnimationFrame(() => {
-      listContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    setSearchQuery('');
+    scrollToSection(listContainerRef);
   };
 
   // Filter items in real time based on active category tabs and search bars
@@ -611,6 +626,110 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           <Shield className="w-[18px] h-[18px]" strokeWidth={1.6} />
         </button>
 
+        {/* Quick-route menu: jump anywhere without scrolling the whole page */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2">
+          <button
+            type="button"
+            onClick={() => setIsQuickMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={isQuickMenuOpen}
+            aria-label="Quick navigation"
+            className={`p-2 rounded-full active:scale-95 transition-all cursor-pointer ${
+              isQuickMenuOpen ? 'text-accent bg-paper-2' : 'text-faint hover:text-accent hover:bg-paper-2'
+            }`}
+          >
+            <MoreVertical className="w-[18px] h-[18px]" strokeWidth={1.8} />
+          </button>
+
+          {isQuickMenuOpen && (
+            <>
+              {/* Click-away catcher sits under the panel but over the page */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsQuickMenuOpen(false)}
+              />
+              <div
+                role="menu"
+                className="absolute left-0 top-[calc(100%+8px)] z-50 w-60 bg-card border border-line rounded-2xl shadow-lift overflow-hidden animate-fadeIn"
+              >
+                <div className="px-4 pt-3 pb-2">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-faint font-sans font-semibold">Go to</p>
+                </div>
+
+                {activeOrderId && activeOrder && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setIsQuickMenuOpen(false); setIsTrackingOpen(true); }}
+                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                  >
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent animate-livedot shrink-0" />
+                    <span className="text-[13px] font-medium text-ink">Track my order</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setIsQuickMenuOpen(false); scrollToSection(searchRef); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                >
+                  <Search className="w-4 h-4 text-accent shrink-0" strokeWidth={1.7} />
+                  <span className="text-[13px] font-medium text-ink">Search the menu</span>
+                </button>
+
+                <div className="max-h-56 overflow-y-auto border-y border-line my-1 py-1">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setIsQuickMenuOpen(false); handleSelectCategory(cat.id); }}
+                      className={`w-full px-4 py-2 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer ${
+                        activeCategory === cat.id ? 'bg-paper-2' : ''
+                      }`}
+                    >
+                      <img
+                        src={cat.image}
+                        alt=""
+                        loading="lazy"
+                        onError={(e) => {
+                          const el = e.currentTarget as HTMLImageElement;
+                          if (el.src !== cat.imageFallback) el.src = cat.imageFallback;
+                        }}
+                        className="w-6 h-6 rounded-lg object-cover shrink-0 ring-1 ring-line"
+                      />
+                      <span className={`text-[13px] ${activeCategory === cat.id ? 'text-ink font-semibold' : 'text-muted font-medium'}`}>
+                        {cat.nameEn}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setIsQuickMenuOpen(false); scrollToSection(loyaltyRef); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                >
+                  <Award className="w-4 h-4 text-accent shrink-0" strokeWidth={1.7} />
+                  <span className="text-[13px] font-medium text-ink">Loyalty & rewards</span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setIsQuickMenuOpen(false); scrollToSection(topRef); }}
+                  className="w-full px-4 py-2.5 mb-1 flex items-center gap-2.5 text-left hover:bg-paper-2 transition cursor-pointer"
+                >
+                  <ArrowUp className="w-4 h-4 text-accent shrink-0" strokeWidth={1.7} />
+                  <span className="text-[13px] font-medium text-ink">Back to top</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Monogram emblem */}
         <div className="w-12 h-12 rounded-full border border-accent/30 flex items-center justify-center bg-paper">
           <span className="font-serif text-[19px] font-semibold tracking-[0.15em] text-accent leading-none pl-[3px]">IC</span>
@@ -627,6 +746,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
       {/* Main Content Area optimized for mobile */}
       <main className="flex-1 w-full max-w-md mx-auto pb-28 px-4 flex flex-col gap-6 pt-4">
+        <div ref={topRef} aria-hidden className="h-0 scroll-mt-4" />
 
         {/* Dynamic Tracking Status Floating Widget - visible at any state */}
         {activeOrderId && activeOrder && (
@@ -657,174 +777,12 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           </div>
         )}
 
-        {/* --- 5-DAY COFFEE STREAK CLUB --- */}
-        <div className="w-full bg-espresso rounded-2xl p-5 shadow-soft text-cream relative overflow-hidden flex flex-col gap-4 select-none">
-          <div className="flex justify-between items-start gap-4">
-            <div>
-              <h3 className="font-serif text-[22px] leading-tight font-semibold text-cream">The 5-Day Streak</h3>
-              <p className="text-[12px] text-cream-muted leading-relaxed mt-1 max-w-[46ch]">
-                Order five days in a row and your sixth is on us: 20% off the whole bill, or a gift on the house.
-              </p>
-            </div>
-            <Award className="w-6 h-6 text-accent shrink-0 mt-1" strokeWidth={1.5} />
-          </div>
 
-          {/* Phone/Email input */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Phone or email to check your streak"
-              value={loyaltyInput}
-              onChange={(e) => setLoyaltyInput(e.target.value)}
-              className="flex-1 text-[13px] bg-white/8 border border-white/12 rounded-xl px-3.5 py-2.5 text-cream placeholder-cream-muted/70 focus:outline-none focus:border-accent/60 transition"
-            />
-            <button
-              type="button"
-              onClick={handleCheckLoyalty}
-              disabled={isCheckingLoyalty || !loyaltyInput.trim()}
-              className="bg-accent hover:bg-accent-deep disabled:opacity-40 text-cream font-semibold px-5 py-2.5 rounded-xl text-[13px] flex items-center justify-center cursor-pointer transition active:scale-95"
-            >
-              {isCheckingLoyalty ? "…" : "Check"}
-            </button>
-          </div>
-
-          {checkedProfile ? (
-            <div className="bg-white/5 rounded-xl p-4 border border-white/8 text-left space-y-4 animate-fadeIn">
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[12px] text-cream truncate max-w-[170px]">{checkedProfile.identifier}</span>
-                <span className="text-cream-muted font-medium text-[11px]">
-                  Day {checkedProfile.streak} of 5
-                </span>
-              </div>
-
-              {/* Progress track */}
-              <div className="flex gap-2 items-center">
-                {[1, 2, 3, 4, 5].map((day) => {
-                  const isActive = checkedProfile.streak >= day;
-                  return (
-                    <div key={day} className="flex-1">
-                      <div className={`h-1.5 rounded-full transition-all ${
-                        isActive ? 'bg-accent' : 'bg-white/12'
-                      }`} />
-                    </div>
-                  );
-                })}
-              </div>
-
-              {checkedProfile.rewardAvailable ? (
-                <div className="text-[12px] text-cream flex items-start gap-2.5 bg-accent/15 p-3 rounded-xl border border-accent/25">
-                  <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={2} />
-                  <div>
-                    <p className="font-semibold text-cream">Your reward is ready</p>
-                    <p className="text-[11px] text-cream-muted leading-relaxed mt-0.5">Use <span className="text-accent font-medium">{checkedProfile.identifier}</span> at checkout and toggle your reward.</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[11.5px] text-cream-muted leading-relaxed">
-                  {checkedProfile.streak === 0
-                    ? "No visit logged today. Place an order to begin day one. A missed day resets the streak."
-                    : checkedProfile.streak === 5
-                    ? "Streak complete. Redeem your reward on your next order."
-                    : `Nicely done. Come back tomorrow to reach day ${checkedProfile.streak + 1}.`}
-                </p>
-              )}
-            </div>
-          ) : (
-            loyaltyInfoMsg && (
-              <p className="text-[11.5px] text-cream-muted text-center bg-white/5 p-3 rounded-xl border border-white/8">
-                {loyaltyInfoMsg}
-              </p>
-            )
-          )}
-        </div>
-
-        {/* --- EXCLUSIVE LOYALTY REWARDS SELECTION --- */}
-        {menuItems && actualRewardProductIds && actualRewardProductIds.length > 0 && (
-          <div className="w-full bg-card rounded-2xl p-5 border border-line text-ink space-y-4 animate-fadeIn shadow-soft">
-            <div className="flex justify-between items-start gap-4">
-              <div>
-                <h3 className="font-serif text-[22px] leading-tight font-semibold text-ink">Loyalty Gifts</h3>
-                <p className="text-[12px] text-muted leading-relaxed mt-1 max-w-[46ch] font-sans">
-                  Complete your five-day streak and one of these three is yours, free.
-                </p>
-              </div>
-              <Sparkles className="w-5 h-5 text-accent shrink-0 mt-1" strokeWidth={1.5} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              {actualRewardProductIds
-                .map((id) => menuItems.find((p) => p.id === id))
-                .filter((prod): prod is MenuItem => !!prod)
-                .slice(0, 3)
-                .map((prod) => {
-                  const hasEligibleReward =
-                    (checkedProfile && checkedProfile.rewardAvailable) ||
-                    (checkoutProfile && checkoutProfile.rewardAvailable);
-
-                  const isAlreadyInCart = cart.some(
-                    (ci) => ci.id === prod.id && ci.isLoyaltyFree
-                  );
-
-                  return (
-                    <div
-                      key={prod.id}
-                      className="bg-paper border border-line rounded-xl p-3 flex items-center gap-3.5 group transition duration-300"
-                    >
-                      <div className="w-16 h-16 rounded-xl bg-card flex-shrink-0 flex items-center justify-center border border-line">
-                        <MenuImage
-                          itemId={prod.id}
-                          category={prod.category}
-                          className="w-12 h-12"
-                          image={prod.image}
-                        />
-                      </div>
-
-                      <div className="select-text flex-1 min-w-0">
-                        <h4 className="text-[13px] font-serif font-semibold text-ink leading-snug break-words">
-                          {prod.nameEn}
-                        </h4>
-                        <span className="text-[12px] text-muted font-serif block leading-normal">
-                          {prod.nameAr}
-                        </span>
-                        <div className="mt-1 font-mono text-[11px]">
-                          {hasEligibleReward ? (
-                            <span className="text-accent font-medium">
-                              Free <span className="text-faint line-through ml-1">{prod.price} SR</span>
-                            </span>
-                          ) : (
-                            <span className="text-faint">{prod.price} SR</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {hasEligibleReward ? (
-                        <button
-                          type="button"
-                          onClick={() => handleClaimFreeLoyaltyProduct(prod)}
-                          disabled={isAlreadyInCart}
-                          className={`shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition cursor-pointer active:scale-95 ${
-                            isAlreadyInCart
-                              ? "bg-accent/12 text-accent"
-                              : "bg-accent hover:bg-accent-deep text-cream"
-                          }`}
-                        >
-                          {isAlreadyInCart ? "Added" : "Claim"}
-                        </button>
-                      ) : (
-                        <div className="shrink-0 px-3 py-2 rounded-full text-center inline-flex items-center gap-1.5 text-faint text-[11px] font-medium">
-                          <Lock className="w-3 h-3" strokeWidth={1.8} />
-                          Day 5
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        )}
+        {/* Auto-scrolling showcase of the branded category artwork */}
+        <PromoCarousel onSelectCategory={handleSelectCategory} />
 
         {/* Search bar */}
-        <div className="relative">
+        <div ref={searchRef} className="relative scroll-mt-4">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" strokeWidth={1.6} />
           <input
             type="text"
@@ -1035,6 +993,175 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                  );
                })}
              </div>
+          )}
+        </div>
+
+        {/* --- LOYALTY, ANCHORED AT THE FOOT OF THE MENU --- */}
+        <div ref={loyaltyRef} className="flex flex-col gap-6 scroll-mt-4 pt-2">
+          {/* --- 5-DAY COFFEE STREAK CLUB --- */}
+          <div className="w-full bg-espresso rounded-2xl p-5 shadow-soft text-cream relative overflow-hidden flex flex-col gap-4 select-none">
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <h3 className="font-serif text-[22px] leading-tight font-semibold text-cream">The 5-Day Streak</h3>
+                <p className="text-[12px] text-cream-muted leading-relaxed mt-1 max-w-[46ch]">
+                  Order five days in a row and your sixth is on us: 20% off the whole bill, or a gift on the house.
+                </p>
+              </div>
+              <Award className="w-6 h-6 text-accent shrink-0 mt-1" strokeWidth={1.5} />
+            </div>
+
+            {/* Phone/Email input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Phone or email to check your streak"
+                value={loyaltyInput}
+                onChange={(e) => setLoyaltyInput(e.target.value)}
+                className="flex-1 text-[13px] bg-white/8 border border-white/12 rounded-xl px-3.5 py-2.5 text-cream placeholder-cream-muted/70 focus:outline-none focus:border-accent/60 transition"
+              />
+              <button
+                type="button"
+                onClick={handleCheckLoyalty}
+                disabled={isCheckingLoyalty || !loyaltyInput.trim()}
+                className="bg-accent hover:bg-accent-deep disabled:opacity-40 text-cream font-semibold px-5 py-2.5 rounded-xl text-[13px] flex items-center justify-center cursor-pointer transition active:scale-95"
+              >
+                {isCheckingLoyalty ? "…" : "Check"}
+              </button>
+            </div>
+
+            {checkedProfile ? (
+              <div className="bg-white/5 rounded-xl p-4 border border-white/8 text-left space-y-4 animate-fadeIn">
+                <div className="flex justify-between items-center">
+                  <span className="font-mono text-[12px] text-cream truncate max-w-[170px]">{checkedProfile.identifier}</span>
+                  <span className="text-cream-muted font-medium text-[11px]">
+                    Day {checkedProfile.streak} of 5
+                  </span>
+                </div>
+
+                {/* Progress track */}
+                <div className="flex gap-2 items-center">
+                  {[1, 2, 3, 4, 5].map((day) => {
+                    const isActive = checkedProfile.streak >= day;
+                    return (
+                      <div key={day} className="flex-1">
+                        <div className={`h-1.5 rounded-full transition-all ${
+                          isActive ? 'bg-accent' : 'bg-white/12'
+                        }`} />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {checkedProfile.rewardAvailable ? (
+                  <div className="text-[12px] text-cream flex items-start gap-2.5 bg-accent/15 p-3 rounded-xl border border-accent/25">
+                    <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={2} />
+                    <div>
+                      <p className="font-semibold text-cream">Your reward is ready</p>
+                      <p className="text-[11px] text-cream-muted leading-relaxed mt-0.5">Use <span className="text-accent font-medium">{checkedProfile.identifier}</span> at checkout and toggle your reward.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11.5px] text-cream-muted leading-relaxed">
+                    {checkedProfile.streak === 0
+                      ? "No visit logged today. Place an order to begin day one. A missed day resets the streak."
+                      : checkedProfile.streak === 5
+                      ? "Streak complete. Redeem your reward on your next order."
+                      : `Nicely done. Come back tomorrow to reach day ${checkedProfile.streak + 1}.`}
+                  </p>
+                )}
+              </div>
+            ) : (
+              loyaltyInfoMsg && (
+                <p className="text-[11.5px] text-cream-muted text-center bg-white/5 p-3 rounded-xl border border-white/8">
+                  {loyaltyInfoMsg}
+                </p>
+              )
+            )}
+          </div>
+
+          {/* --- EXCLUSIVE LOYALTY REWARDS SELECTION --- */}
+          {menuItems && actualRewardProductIds && actualRewardProductIds.length > 0 && (
+            <div className="w-full bg-card rounded-2xl p-5 border border-line text-ink space-y-4 animate-fadeIn shadow-soft">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <h3 className="font-serif text-[22px] leading-tight font-semibold text-ink">Loyalty Gifts</h3>
+                  <p className="text-[12px] text-muted leading-relaxed mt-1 max-w-[46ch] font-sans">
+                    Complete your five-day streak and one of these three is yours, free.
+                  </p>
+                </div>
+                <Sparkles className="w-5 h-5 text-accent shrink-0 mt-1" strokeWidth={1.5} />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {actualRewardProductIds
+                  .map((id) => menuItems.find((p) => p.id === id))
+                  .filter((prod): prod is MenuItem => !!prod)
+                  .slice(0, 3)
+                  .map((prod) => {
+                    const hasEligibleReward =
+                      (checkedProfile && checkedProfile.rewardAvailable) ||
+                      (checkoutProfile && checkoutProfile.rewardAvailable);
+
+                    const isAlreadyInCart = cart.some(
+                      (ci) => ci.id === prod.id && ci.isLoyaltyFree
+                    );
+
+                    return (
+                      <div
+                        key={prod.id}
+                        className="bg-paper border border-line rounded-xl p-3 flex items-center gap-3.5 group transition duration-300"
+                      >
+                        <div className="w-16 h-16 rounded-xl bg-card flex-shrink-0 flex items-center justify-center border border-line">
+                          <MenuImage
+                            itemId={prod.id}
+                            category={prod.category}
+                            className="w-12 h-12"
+                            image={prod.image}
+                          />
+                        </div>
+
+                        <div className="select-text flex-1 min-w-0">
+                          <h4 className="text-[13px] font-serif font-semibold text-ink leading-snug break-words">
+                            {prod.nameEn}
+                          </h4>
+                          <span className="text-[12px] text-muted font-serif block leading-normal">
+                            {prod.nameAr}
+                          </span>
+                          <div className="mt-1 font-mono text-[11px]">
+                            {hasEligibleReward ? (
+                              <span className="text-accent font-medium">
+                                Free <span className="text-faint line-through ml-1">{prod.price} SR</span>
+                              </span>
+                            ) : (
+                              <span className="text-faint">{prod.price} SR</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {hasEligibleReward ? (
+                          <button
+                            type="button"
+                            onClick={() => handleClaimFreeLoyaltyProduct(prod)}
+                            disabled={isAlreadyInCart}
+                            className={`shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition cursor-pointer active:scale-95 ${
+                              isAlreadyInCart
+                                ? "bg-accent/12 text-accent"
+                                : "bg-accent hover:bg-accent-deep text-cream"
+                            }`}
+                          >
+                            {isAlreadyInCart ? "Added" : "Claim"}
+                          </button>
+                        ) : (
+                          <div className="shrink-0 px-3 py-2 rounded-full text-center inline-flex items-center gap-1.5 text-faint text-[11px] font-medium">
+                            <Lock className="w-3 h-3" strokeWidth={1.8} />
+                            Day 5
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
           )}
         </div>
 
