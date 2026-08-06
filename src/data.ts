@@ -18,6 +18,19 @@ export interface MenuItem {
 export const CATEGORY_IMAGE_CDN =
   'https://aaetqwwpsigcuwyuhlvy.supabase.co/storage/v1/object/public/menu-assets/categories';
 
+// Shop logo, bundled with the app and mirrored to the Supabase CDN.
+export const SHOP_LOGO = '/brand/logo.webp';
+export const SHOP_LOGO_FALLBACK =
+  'https://aaetqwwpsigcuwyuhlvy.supabase.co/storage/v1/object/public/menu-assets/brand/logo.png';
+
+// Shop contact. WHATSAPP_NUMBER is digits-only in full international form, which is
+// what wa.me requires — no +, spaces or leading zero.
+export const SHOP_PHONE_DISPLAY = '056 309 7928';
+export const SHOP_PHONE_TEL = '+966563097928';
+export const WHATSAPP_NUMBER = '966563097928';
+export const whatsappLink = (message?: string) =>
+  `https://wa.me/${WHATSAPP_NUMBER}${message ? `?text=${encodeURIComponent(message)}` : ''}`;
+
 export interface Category {
   id: string;
   nameEn: string;

@@ -78,6 +78,12 @@
   25% { transform: translateX(-4px); }
   75% { transform: translateX(4px); }
 }
+/* Halo behind the WhatsApp button — the ring animates, the button stays still. */
+@keyframes ic-whatsapp-pulse {
+  0%   { transform: scale(1);    opacity: 0.40; }
+  70%  { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
 @keyframes ic-pulse-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -88,13 +94,15 @@
 .animate-slideDown { animation: ic-slide-down 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-shake { animation: ic-shake 0.4s ease-in-out both; }
 .animate-livedot { animation: ic-pulse-dot 1.8s ease-in-out infinite; }
+.animate-whatsappPulse { animation: ic-whatsapp-pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fadeIn,
   .animate-slideUp,
   .animate-slideDown,
   .animate-shake,
-  .animate-livedot {
+  .animate-livedot,
+  .animate-whatsappPulse {
     animation: none !important;
   }
   * {

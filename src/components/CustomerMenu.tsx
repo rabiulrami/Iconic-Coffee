@@ -30,13 +30,16 @@ import {
   CreditCard,
   Menu,
   Leaf,
+  MessageCircle,
   ArrowUp,
   Info,
   MapPin,
   Clock
 } from 'lucide-react';
 import PromoCarousel from './PromoCarousel';
+import WhatsAppButton from './WhatsAppButton';
 import { searchItems } from '../lib/search';
+import { SHOP_LOGO, SHOP_LOGO_FALLBACK, SHOP_PHONE_DISPLAY, SHOP_PHONE_TEL, whatsappLink } from '../data';
 import { CATEGORIES, MENU_ITEMS, Category, MenuItem } from '../data';
 import MenuImage from './MenuImage';
 
@@ -465,10 +468,6 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
       triggerToast('Your signboard photo is still uploading. One moment.', "error");
       return;
     }
-    if (!signboardUrl) {
-      triggerToast('Please upload a photo of your shop signboard.', "error");
-      return;
-    }
     if (!paymentMethod) {
       triggerToast('Please choose how you are paying: Cash or Card (Mada).', "error");
       return;
@@ -672,9 +671,17 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           <Menu className="w-[18px] h-[18px]" strokeWidth={1.8} />
         </button>
 
-        {/* Monogram emblem */}
-        <div className="w-12 h-12 rounded-full border border-accent/30 flex items-center justify-center bg-paper">
-          <span className="font-serif text-[19px] font-semibold tracking-[0.15em] text-accent leading-none pl-[3px]">IC</span>
+        {/* Shop logo */}
+        <div className="w-12 h-12 rounded-full border border-accent/25 overflow-hidden bg-white shadow-soft">
+          <img
+            src={SHOP_LOGO}
+            alt="Iconic Coffee"
+            onError={(e) => {
+              const el = e.currentTarget as HTMLImageElement;
+              if (el.src !== SHOP_LOGO_FALLBACK) el.src = SHOP_LOGO_FALLBACK;
+            }}
+            className="w-full h-full object-contain scale-[1.08]"
+          />
         </div>
 
         {/* Wordmark */}
@@ -1151,6 +1158,9 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
       </main>
 
+      {/* Always-available WhatsApp shortcut; lifts above the cart bar when it shows */}
+      <WhatsAppButton raised={totalCartItemsCount > 0 && !isCartOpen} />
+
       {/* Persistent Floating Bottom Cart Bar */}
       {totalCartItemsCount > 0 && !isCartOpen && (
         <div className="fixed bottom-4 inset-x-4 max-w-md mx-auto z-40 animate-slideUp">
@@ -1345,12 +1355,16 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   </div>
                 )}
 
-                {/* Step 4 — Signboard photo */}
+                {/* Step 4 — Signboard photo (optional; it just helps the runner find you) */}
                 {floor && (
                   <div className="space-y-1.5 animate-fadeIn">
                     <label className="text-[12px] font-medium text-ink block">
-                      Signboard photo / صورة اللوحة <span className="text-accent">*</span>
+                      Signboard photo / صورة اللوحة{' '}
+                      <span className="text-faint font-normal">(optional)</span>
                     </label>
+                    <p className="text-[11px] text-muted leading-relaxed">
+                      Helps our runner spot your shop faster — you can skip it.
+                    </p>
 
                     <input
                       ref={signboardInputRef}
@@ -1779,7 +1793,19 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
             <a
               role="menuitem"
-              href="tel:+966500000000"
+              href={whatsappLink('Hello Iconic Coffee, I would like to ask about my order.')}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setIsQuickMenuOpen(false)}
+              className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 text-[#25D366] shrink-0" strokeWidth={2} />
+              <span className="text-[14px] font-semibold text-cream">WhatsApp us</span>
+            </a>
+
+            <a
+              role="menuitem"
+              href={`tel:${SHOP_PHONE_TEL}`}
               onClick={() => setIsQuickMenuOpen(false)}
               className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
             >
@@ -1836,8 +1862,16 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
             <div className="overflow-y-auto p-5 space-y-5">
               <div className="flex flex-col items-center text-center gap-2.5 pb-1">
-                <div className="w-14 h-14 rounded-full border border-accent/30 flex items-center justify-center bg-card">
-                  <span className="font-serif text-[21px] font-semibold tracking-[0.15em] text-accent leading-none pl-[3px]">IC</span>
+                <div className="w-20 h-20 rounded-full border border-accent/25 overflow-hidden bg-white shadow-soft">
+                  <img
+                    src={SHOP_LOGO}
+                    alt="Iconic Coffee"
+                    onError={(e) => {
+                      const el = e.currentTarget as HTMLImageElement;
+                      if (el.src !== SHOP_LOGO_FALLBACK) el.src = SHOP_LOGO_FALLBACK;
+                    }}
+                    className="w-full h-full object-contain scale-[1.08]"
+                  />
                 </div>
                 <div>
                   <p className="font-serif text-[20px] font-semibold tracking-[0.12em] uppercase text-ink">Iconic Coffee</p>
@@ -1876,13 +1910,26 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                 </div>
 
                 <a
-                  href="tel:+966500000000"
+                  href={whatsappLink('Hello Iconic Coffee, I would like to ask about my order.')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl hover:border-[#25D366]/50 transition"
+                >
+                  <MessageCircle className="w-4 h-4 text-[#25D366] shrink-0 mt-0.5" strokeWidth={1.7} />
+                  <div>
+                    <p className="text-[12.5px] font-medium text-ink">WhatsApp us</p>
+                    <p className="text-[11.5px] text-muted leading-relaxed mt-0.5 font-mono">{SHOP_PHONE_DISPLAY}</p>
+                  </div>
+                </a>
+
+                <a
+                  href={`tel:${SHOP_PHONE_TEL}`}
                   className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl hover:border-accent/40 transition"
                 >
                   <PhoneCall className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={1.7} />
                   <div>
-                    <p className="text-[12.5px] font-medium text-ink">Talk to us</p>
-                    <p className="text-[11.5px] text-muted leading-relaxed mt-0.5 font-mono">+966 50 000 0000</p>
+                    <p className="text-[12.5px] font-medium text-ink">Call us</p>
+                    <p className="text-[11.5px] text-muted leading-relaxed mt-0.5 font-mono">{SHOP_PHONE_DISPLAY}</p>
                   </div>
                 </a>
               </div>
