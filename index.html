@@ -3,11 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="theme-color" content="#4C091B" />
+    <title>Iconic Coffee — Menu</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="description" content="Iconic Coffee at Makkah Mall — specialty coffee, boba, matcha, shakes, juice and fresh bakery, delivered to your shop." />
+    <!-- Product photos are served from Cloudinary; warm the connection before the
+         first image is requested so the grid does not wait on a cold TLS handshake. -->
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

@@ -1,13 +1,16 @@
 import React from 'react';
+import { IMG, optimizedImage } from '../lib/images';
 
 interface MenuImageProps {
   itemId: string;
   category: string;
   className?: string;
   image?: string;
+  /** Rendered width in CSS px; the hosted image is requested at roughly 3x this. */
+  width?: number;
 }
 
-export default function MenuImage({ itemId, category, className = "w-16 h-16", image }: MenuImageProps) {
+export default function MenuImage({ itemId, category, className = "w-16 h-16", image, width = IMG.thumb }: MenuImageProps) {
   // Check if image or itemId looks like an image URL, path, or Base64 string
   const isUrl = (str?: string) => {
     if (!str) return false;
@@ -31,9 +34,12 @@ export default function MenuImage({ itemId, category, className = "w-16 h-16", i
   if (imageSrc) {
     return (
       <div className={`relative ${className} flex items-center justify-center overflow-hidden rounded-full bg-[#FAF6F0]`}>
-        <img 
-          src={imageSrc} 
-          alt="" 
+        <img
+          // Uploads are full-resolution camera shots; ask the CDN for the painted size.
+          src={optimizedImage(imageSrc, width)}
+          alt=""
+          loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover rounded-full"
           onError={(e) => {

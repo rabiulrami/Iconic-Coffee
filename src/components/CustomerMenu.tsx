@@ -39,7 +39,8 @@ import {
 import PromoCarousel from './PromoCarousel';
 import WhatsAppButton from './WhatsAppButton';
 import { searchItems } from '../lib/search';
-import { SHOP_LOGO, SHOP_LOGO_FALLBACK, SHOP_PHONE_DISPLAY, SHOP_PHONE_TEL, whatsappLink } from '../data';
+import { IMG, downscaleImage } from '../lib/images';
+import { SHOP_LOGO, SHOP_LOGO_FALLBACK, SHOP_MAP_URL, SHOP_PHONE_DISPLAY, SHOP_PHONE_TEL, whatsappLink } from '../data';
 import { CATEGORIES, MENU_ITEMS, Category, MenuItem } from '../data';
 import MenuImage from './MenuImage';
 
@@ -409,12 +410,9 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     setIsUploadingSignboard(true);
     setSignboardUrl('');
     try {
-      const base64: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('Could not read that photo.'));
-        reader.readAsDataURL(file);
-      });
+      // Signboard shots come straight from the phone camera; shrink before sending so
+      // a customer on mall wifi is not uploading several megabytes.
+      const base64: string = await downscaleImage(file, 1400);
 
       setSignboardPreview(base64);
 
@@ -672,7 +670,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
         </button>
 
         {/* Shop logo */}
-        <div className="w-12 h-12 rounded-full border border-accent/25 overflow-hidden bg-white shadow-soft">
+        <div className="w-12 h-12 rounded-full border border-accent/25 overflow-hidden shadow-soft">
           <img
             src={SHOP_LOGO}
             alt="Iconic Coffee"
@@ -680,7 +678,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
               const el = e.currentTarget as HTMLImageElement;
               if (el.src !== SHOP_LOGO_FALLBACK) el.src = SHOP_LOGO_FALLBACK;
             }}
-            className="w-full h-full object-contain scale-[1.08]"
+            className="w-full h-full object-cover"
           />
         </div>
 
@@ -1105,6 +1103,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                           <MenuImage
                             itemId={prod.id}
                             category={prod.category}
+                            width={IMG.small}
                             className="w-12 h-12"
                             image={prod.image}
                           />
@@ -1234,7 +1233,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-11 h-11 rounded-lg bg-paper border border-line flex-shrink-0 flex items-center justify-center">
-                          <MenuImage itemId={c.id} category={c.category} className="w-8 h-8" image={c.image} />
+                          <MenuImage itemId={c.id} category={c.category} width={IMG.small} className="w-8 h-8" image={c.image} />
                         </div>
                         <div className="min-w-0 text-left">
                           <h4 className="text-[13.5px] font-serif font-bold text-ink leading-snug break-words flex items-start gap-1.5">
@@ -1547,6 +1546,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                                           <MenuImage
                                             itemId={prod.id}
                                             category={prod.category}
+                                            width={IMG.small}
                                             className="w-7 h-7"
                                             image={prod.image}
                                           />
@@ -1862,7 +1862,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
 
             <div className="overflow-y-auto p-5 space-y-5">
               <div className="flex flex-col items-center text-center gap-2.5 pb-1">
-                <div className="w-20 h-20 rounded-full border border-accent/25 overflow-hidden bg-white shadow-soft">
+                <div className="w-20 h-20 rounded-full border border-accent/25 overflow-hidden shadow-soft">
                   <img
                     src={SHOP_LOGO}
                     alt="Iconic Coffee"
@@ -1870,7 +1870,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                       const el = e.currentTarget as HTMLImageElement;
                       if (el.src !== SHOP_LOGO_FALLBACK) el.src = SHOP_LOGO_FALLBACK;
                     }}
-                    className="w-full h-full object-contain scale-[1.08]"
+                    className="w-full h-full object-cover"
                   />
                 </div>
                 <div>
@@ -1889,22 +1889,31 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
               </p>
 
               <div className="space-y-2.5 pt-1">
-                <div className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl">
+                <a
+                  href={SHOP_MAP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl hover:border-accent/40 transition"
+                >
                   <MapPin className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={1.7} />
-                  <div>
-                    <p className="text-[12.5px] font-medium text-ink">Where we are</p>
+                  <div className="min-w-0">
+                    <p className="text-[12.5px] font-medium text-ink">Makkah Mall</p>
                     <p className="text-[11.5px] text-muted leading-relaxed mt-0.5">
-                      Ground floor, beside the main atrium. We deliver to both floors.
+                      King Abdullah Rd, Al Jamiah, Makkah 24246, Saudi Arabia
                     </p>
+                    <p className="text-[11.5px] text-muted font-serif leading-relaxed mt-0.5" dir="rtl">
+                      سيتي مكة مول — طريق الملك عبدالله، الجامعة، مكة المكرمة
+                    </p>
+                    <p className="text-[11px] text-accent font-medium mt-1.5">Open in Maps</p>
                   </div>
-                </div>
+                </a>
 
                 <div className="flex items-start gap-3 p-3.5 bg-card border border-line rounded-xl">
                   <Clock className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={1.7} />
                   <div>
                     <p className="text-[12.5px] font-medium text-ink">Opening hours</p>
                     <p className="text-[11.5px] text-muted leading-relaxed mt-0.5">
-                      Daily, 9:00 am to 12:00 am
+                      Daily, 9:00 am to 11:00 pm
                     </p>
                   </div>
                 </div>

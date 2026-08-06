@@ -25,6 +25,10 @@ export const SHOP_LOGO_FALLBACK =
 
 // Shop contact. WHATSAPP_NUMBER is digits-only in full international form, which is
 // what wa.me requires — no +, spaces or leading zero.
+// Makkah Mall, King Abdullah Rd, Al Jamiah, Makkah 24246
+export const SHOP_MAP_URL =
+  'https://www.google.com/maps/search/?api=1&query=Makkah+Mall%2C+King+Abdullah+Rd%2C+Al+Jamiah%2C+Makkah+24246%2C+Saudi+Arabia';
+
 export const SHOP_PHONE_DISPLAY = '056 309 7928';
 export const SHOP_PHONE_TEL = '+966563097928';
 export const WHATSAPP_NUMBER = '966563097928';

@@ -28,6 +28,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import AdminPromos from './AdminPromos';
+import { downscaleImage } from '../lib/images';
 
 interface OrderItem {
   id: string;
@@ -60,6 +61,20 @@ interface Order {
 }
 
 const PAYMENT_LABELS: Record<string, string> = { cash: 'Cash', card: 'Card · Mada' };
+
+/**
+ * How each status reads on screen. The stored values are unchanged — renaming them
+ * would strand every existing order — so only the labels differ. "Awaiting Payment"
+ * shows as "Awaiting Order" because the order is what staff are confirming.
+ */
+const STATUS_LABELS: Record<string, string> = {
+  'Awaiting Payment': 'Awaiting Order',
+  'Pending': 'Pending',
+  'Preparing': 'Preparing',
+  'Out for Table': 'Out for Delivery',
+  'Delivered': 'Delivered',
+};
+const statusLabel = (s: string) => STATUS_LABELS[s] ?? s;
 
 /** Single-line destination for an order, tolerant of pre-rollout rows. */
 function describeDestination(order: Pick<Order, 'floor' | 'gate' | 'shopName' | 'tableNumber'>) {
@@ -591,10 +606,11 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
     setIsUploadingImage(true);
     setImageUploadError(null);
 
+    // Shrink before upload so camera-sized originals never reach storage.
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const base64Data = reader.result as string;
+        const base64Data = await downscaleImage(file);
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1285,12 +1301,12 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                     type="button"
                     onClick={() => setFilterStatus(status)}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                      filterStatus === status 
-                        ? 'bg-amber-600 text-white shadow-md' 
+                      filterStatus === status
+                        ? 'bg-amber-600 text-white shadow-md'
                         : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
                     }`}
                   >
-                    {status}
+                    {status === 'All' ? 'All' : statusLabel(status)}
                   </button>
                 ))}
               </div>
@@ -1476,10 +1492,10 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                                 onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
                                 className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold focus:outline-none font-mono cursor-pointer ${statusColor}`}
                               >
-                                <option value="Awaiting Payment">Awaiting Payment 💰</option>
+                                <option value="Awaiting Payment">Awaiting Order 💰</option>
                                 <option value="Pending">Pending ⏳</option>
                                 <option value="Preparing">Preparing ☕</option>
-                                <option value="Out for Table">Out for Table 🏃</option>
+                                <option value="Out for Table">Out for Delivery 🏃</option>
                                 <option value="Delivered">Delivered ✓</option>
                               </select>
                             </td>
@@ -1490,7 +1506,7 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                                   onClick={() => handleUpdateStatus(order.id, 'Preparing')}
                                   className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black text-xs rounded-lg transition-all flex items-center justify-center gap-1 mx-auto shadow-md cursor-pointer"
                                 >
-                                  <Check className="w-3.5 h-3.5" /> Confirm Payment
+                                  <Check className="w-3.5 h-3.5" /> Confirm Order
                                 </button>
                               ) : order.status !== 'Delivered' ? (
                                 <button
@@ -3161,7 +3177,7 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                     >
                       <option value="Preparing">Preparing (قيد التحضير) ☕</option>
                       <option value="Delivered">Delivered & Closed (تم التسليم والإغلاق) ✓</option>
-                      <option value="Awaiting Payment">Awaiting Payment (بانتظار الدفع) 💵</option>
+                      <option value="Awaiting Payment">Awaiting Order (بانتظار التأكيد) 💵</option>
                     </select>
                   </div>
                 </div>

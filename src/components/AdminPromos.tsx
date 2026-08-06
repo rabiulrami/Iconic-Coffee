@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, Plus, Trash2, Upload, Eye, EyeOff, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { CATEGORIES } from '../data';
+import { downscaleImage } from '../lib/images';
 
 interface Promo {
   id: string;
@@ -62,12 +63,8 @@ export default function AdminPromos() {
     }
     setUploading(true);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      // Promo art is painted at 268px wide; 1600 keeps it crisp without the bulk.
+      const base64 = await downscaleImage(file, 1600);
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
