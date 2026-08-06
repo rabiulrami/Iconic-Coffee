@@ -68,7 +68,10 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   };
 
   // Category state
-  const [activeCategory, setActiveCategory] = useState('specials');
+  // 'specials' is the landing view. Anything else means the customer has drilled into
+  // a category, which is treated as a separate page.
+  const HOME_CATEGORY = 'specials';
+  const [activeCategory, setActiveCategory] = useState(HOME_CATEGORY);
   const [searchQuery, setSearchQuery] = useState('');
   // Category ids whose branded photo (and CDN fallback) failed to load
   const [brokenCatImages, setBrokenCatImages] = useState<string[]>([]);
@@ -611,6 +614,9 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   };
 
   const isSearching = searchQuery.trim() !== '';
+  // The landing view. Loyalty lives here only — drilling into a category or running a
+  // search is its own page and shows just those products.
+  const isHomeView = !isSearching && activeCategory === HOME_CATEGORY;
 
   // A search runs across the whole menu, not just the open category — someone typing
   // "juice" while Specials happens to be selected means to find the juices. Without a
@@ -960,7 +966,8 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           )}
         </div>
 
-        {/* --- LOYALTY, ANCHORED AT THE FOOT OF THE MENU --- */}
+        {/* --- LOYALTY, AT THE FOOT OF THE LANDING VIEW ONLY --- */}
+        {isHomeView && (
         <div ref={loyaltyRef} className="flex flex-col gap-6 scroll-mt-4 pt-2">
           {/* --- 5-DAY COFFEE STREAK CLUB --- */}
           <div className="w-full bg-espresso rounded-2xl p-5 shadow-soft text-cream relative overflow-hidden flex flex-col gap-4 select-none">
@@ -1128,6 +1135,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
             </div>
           )}
         </div>
+        )}
 
       </main>
 
@@ -1733,7 +1741,14 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
             <button
               type="button"
               role="menuitem"
-              onClick={() => { setIsQuickMenuOpen(false); scrollToSection(loyaltyRef); }}
+              // Loyalty only renders on the landing view, so go back there first.
+              onClick={() => {
+                setIsQuickMenuOpen(false);
+                setSearchQuery('');
+                setActiveCategory(HOME_CATEGORY);
+                // One frame for the section to mount before scrolling to it.
+                requestAnimationFrame(() => scrollToSection(loyaltyRef));
+              }}
               className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
             >
               <Award className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />

@@ -7,7 +7,10 @@ coverage/
 .env*
 !.env.example
 
-# Local-mode runtime data (regenerated at startup; the source of truth is Supabase)
+# Local-mode runtime data (regenerated at startup; the source of truth is Supabase).
+# Anything added here must also go in server.watch.ignored in vite.config.ts — these
+# files are rewritten on ordinary reads, and a watched one puts the dev server into a
+# reload loop.
 products.json
 staff.json
 orders.json

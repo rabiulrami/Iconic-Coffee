@@ -21,12 +21,16 @@ export default defineConfig(() => {
         // files during ordinary reads (order polling, product fetches). Watching them
         // turns every poll into a full reload, which refetches and rewrites them
         // again — an endless refresh loop. Only source changes should reload.
+        // Keep in step with the runtime-data block in .gitignore: anything the API
+        // writes at runtime belongs in both lists. Missing one here is what brings
+        // the reload loop back.
         ignored: [
           '**/orders.json',
           '**/products.json',
           '**/staff.json',
           '**/loyalty.json',
           '**/loyalty_settings.json',
+          '**/promos.json',
           '**/admin_pin.json',
           '**/database.json',
           '**/sheets_config.json',
