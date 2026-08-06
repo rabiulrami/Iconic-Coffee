@@ -385,11 +385,13 @@ export default function MenuImage({ itemId, category, className = "w-16 h-16", i
     }
   } else if (category === 'matcha') {
     beverageColor = "bg-emerald-500";
-    if (itemId.includes('shake')) {
-      if (itemId.includes('lotus')) beverageColor = "bg-orange-100";
-      if (itemId.includes('nutella')) beverageColor = "bg-amber-900";
-      if (itemId.includes('oreo')) beverageColor = "bg-neutral-800";
-    }
+  } else if (category === 'shake') {
+    // Milk shakes split out of 'matcha' into their own category; tint by flavour.
+    beverageColor = "bg-[#f1e3d4]";
+    if (itemId.includes('lotus')) beverageColor = "bg-orange-200";
+    if (itemId.includes('nutella')) beverageColor = "bg-amber-900";
+    if (itemId.includes('oreo')) beverageColor = "bg-neutral-700";
+    if (itemId.includes('mango')) beverageColor = "bg-yellow-300";
   } else if (category === 'cold') {
     beverageColor = "bg-amber-800/10";
     if (itemId.includes('americano')) beverageColor = "bg-neutral-900";

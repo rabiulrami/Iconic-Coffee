@@ -2759,7 +2759,8 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                     <option value="sweet">Sweet (حلويات) 🍰</option>
                     <option value="boba">Boba Drinks (بوبا) 🧋</option>
                     <option value="cold">Cold Drinks (مشروبات باردة) ❄️</option>
-                    <option value="matcha">Matcha & Shake (ماتشا وشيك) 🍦</option>
+                    <option value="matcha">Matcha (ماتشا) 🍵</option>
+                    <option value="shake">Milk Shakes (ميلك شيك) 🍦</option>
                     <option value="juice">Juice (عصير) 🍊</option>
                     <option value="hot">Hot Drinks (مشروبات ساخنة) ☕</option>
                   </select>

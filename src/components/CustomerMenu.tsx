@@ -29,6 +29,7 @@ import {
   Banknote,
   CreditCard,
   Menu,
+  Leaf,
   ArrowUp,
   Info,
   MapPin,
@@ -552,6 +553,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           case 'Milk': return <Milk className={style} strokeWidth={1.5} />;
           case 'CupSoda': return <CupSoda className={style} strokeWidth={1.5} />;
           case 'IceCream': return <IceCream className={style} strokeWidth={1.5} />;
+          case 'Leaf': return <Leaf className={style} strokeWidth={1.5} />;
           case 'Citrus': return <Citrus className={style} strokeWidth={1.5} />;
           default: return <Coffee className={style} strokeWidth={1.5} />;
         }
@@ -742,8 +744,17 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           )}
         </div>
 
-        {/* Category grid — large branded tile, small label, whole menu visible at once */}
-        <div className="grid grid-cols-4 gap-x-2.5 gap-y-4 pt-1">
+        {/* Categories — headed so it reads as navigation, not a row of products */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="font-serif text-[22px] leading-none font-semibold text-ink">Categories</h3>
+            <span className="text-[13px] text-faint font-serif shrink-0">الأقسام</span>
+          </div>
+          <p className="text-[11.5px] text-muted font-sans -mt-1">
+            Pick one to see everything in it
+          </p>
+
+          <div className="grid grid-cols-4 gap-x-2.5 gap-y-4">
           {CATEGORIES.map((cat) => {
             const active = activeCategory === cat.id;
             return (
@@ -766,8 +777,8 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                 {/* Fixed two-line box keeps every tile on the same baseline.
                     Height must track the font size or the second line clips. */}
                 <span
-                  className={`text-[12.5px] leading-[1.3] text-center font-sans h-[33px] px-0.5 transition-colors ${
-                    active ? 'text-ink font-bold' : 'text-muted font-semibold group-hover:text-ink'
+                  className={`text-[13.5px] leading-[1.25] text-center font-sans font-bold h-[34px] px-0.5 transition-colors ${
+                    active ? 'text-ink' : 'text-ink/75 group-hover:text-ink'
                   }`}
                 >
                   {cat.nameEn}
@@ -775,6 +786,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* --- DAILY SPECIALS HEADER & ROW (IF ACTIVE AND VALID) --- */}

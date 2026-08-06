@@ -60,7 +60,7 @@ export const PROMO_BANNERS: PromoBanner[] = [
   promoBanner('boba', 'Boba Drinks', 'boba'),
   promoBanner('cold', 'Cold Drinks', 'cold'),
   promoBanner('matcha', 'Matcha Drinks', 'matcha'),
-  promoBanner('milkshake', 'Milk Shakes', 'matcha'),
+  promoBanner('milkshake', 'Milk Shakes', 'shake'),
   promoBanner('juice', 'Juice Drinks', 'juice'),
   promoBanner('hot', 'Hot Drinks', 'hot'),
 ];
@@ -70,7 +70,8 @@ export const CATEGORIES: Category[] = [
   { id: 'sweet', nameEn: 'Sweet', nameAr: 'حلويات', icon: 'CakeSlice', ...categoryImage('sweet') },
   { id: 'boba', nameEn: 'Boba Drinks', nameAr: 'بوبا', icon: 'Milk', ...categoryImage('boba') },
   { id: 'cold', nameEn: 'Cold Drinks', nameAr: 'مشروبات باردة', icon: 'CupSoda', ...categoryImage('cold') },
-  { id: 'matcha', nameEn: 'Matcha & Shake', nameAr: 'ماتشا وميلك شيك', icon: 'IceCream', ...categoryImage('matcha') },
+  { id: 'matcha', nameEn: 'Matcha', nameAr: 'ماتشا', icon: 'Leaf', ...categoryImage('matcha') },
+  { id: 'shake', nameEn: 'Milk Shakes', nameAr: 'ميلك شيك', icon: 'IceCream', ...categoryImage('shake') },
   { id: 'juice', nameEn: 'Juice', nameAr: 'عصير', icon: 'Citrus', ...categoryImage('juice') },
   { id: 'hot', nameEn: 'Hot Drinks', nameAr: 'مشروبات ساخنة', icon: 'Coffee', ...categoryImage('hot') },
 ];
@@ -661,7 +662,7 @@ export const MENU_ITEMS: MenuItem[] = [
     price: 18,
     descriptionEn: 'Creamy cold vanilla shake blended with premium Lotus cookie butter.',
     descriptionAr: 'ميلك شيك غني بنكهة بسكويت زبدة اللوتس اللذيذة وقوام كثيف.',
-    category: 'matcha',
+    category: 'shake',
     image: 'lotus_shake'
   },
   {
@@ -671,7 +672,7 @@ export const MENU_ITEMS: MenuItem[] = [
     price: 20,
     descriptionEn: 'Satisfying blended milk shake full of delicious premium Nutella chocolate cream.',
     descriptionAr: 'ميلك شيك نوتيلا الغني بالشخصية واللذيذ يعيد الحيوية ويسعد قلبك.',
-    category: 'matcha',
+    category: 'shake',
     image: 'nutella_shake'
   },
   {
@@ -681,7 +682,7 @@ export const MENU_ITEMS: MenuItem[] = [
     price: 18,
     descriptionEn: 'Vanilla ice cream and cold milk shake blended with crunchy Oreo cookies.',
     descriptionAr: 'ميلك شيك أوريو الكلاسيكي بالبسكويت المطحون ناعماً مع الحليب والآيس كريم.',
-    category: 'matcha',
+    category: 'shake',
     image: 'oreo_shake'
   },
   {
@@ -691,7 +692,7 @@ export const MENU_ITEMS: MenuItem[] = [
     price: 18,
     descriptionEn: 'Sweet tropical cream shake blended with rich pieces of organic mango.',
     descriptionAr: 'ميلك شيك المانجو الذهبي الغني بطعم الكريمة وقطع المانجو الاستوائية.',
-    category: 'matcha',
+    category: 'shake',
     image: 'mango_shake'
   },
 
