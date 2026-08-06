@@ -171,6 +171,7 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
   // Hamburger navigation and the About Us sheet it opens
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const quickMenuRef = useRef<HTMLDivElement>(null);
 
   // Selected loyalty reward products (up to 3)
   const [loyaltyRewardProductIds, setLoyaltyRewardProductIds] = useState<string[]>([]);
@@ -577,6 +578,35 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     );
   };
 
+  // The quick menu is taller than a short window can show. Cap it to the room left
+  // below the button so its own scrollbar appears, instead of the overflow being
+  // unreachable. Measured rather than set in vh: on desktop the menu lives inside a
+  // fixed-height phone frame, so viewport units would overshoot and get clipped.
+  useEffect(() => {
+    if (!isQuickMenuOpen) return;
+    const fit = () => {
+      const panel = quickMenuRef.current;
+      const scroller = document.querySelector<HTMLElement>('[data-app-scroll]');
+      if (!panel || !scroller) return;
+      const room = scroller.getBoundingClientRect().bottom - panel.getBoundingClientRect().top - 12;
+      panel.style.maxHeight = `${Math.max(180, room)}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [isQuickMenuOpen]);
+
+  // Freeze the page while an overlay is up, so a swipe moves the overlay rather than
+  // the menu behind it. The window never scrolls here — the app scroll container does.
+  useEffect(() => {
+    if (!isQuickMenuOpen && !isAboutOpen && !isCartOpen && !isTrackingOpen) return;
+    const scroller = document.querySelector<HTMLElement>('[data-app-scroll]');
+    if (!scroller) return;
+    const previous = scroller.style.overflowY;
+    scroller.style.overflowY = 'hidden';
+    return () => { scroller.style.overflowY = previous; };
+  }, [isQuickMenuOpen, isAboutOpen, isCartOpen, isTrackingOpen]);
+
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     requestAnimationFrame(() => {
       ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -654,8 +684,11 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
               />
               {/* Dark panel: text-only, high contrast against the ivory page behind it */}
               <div
+                ref={quickMenuRef}
                 role="menu"
-                className="absolute left-0 top-[calc(100%+8px)] z-50 w-60 bg-espresso border border-white/10 rounded-2xl shadow-lift overflow-hidden animate-fadeIn"
+                // overscroll-contain stops a swipe that reaches the end of this list
+                // from continuing into the page underneath.
+                className="absolute left-0 top-[calc(100%+8px)] z-50 w-60 bg-espresso border border-white/10 rounded-2xl shadow-lift overflow-y-auto overscroll-contain scrollbar-none animate-fadeIn"
               >
                 <div className="px-4 pt-3.5 pb-2">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-cream-muted font-sans font-bold">Go to</p>

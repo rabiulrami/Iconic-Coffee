@@ -189,8 +189,10 @@ export default function App() {
                 <div className="w-24 h-4 bg-zinc-950 rounded-full" />
               </div>
 
-              {/* Core responsive customer component */}
-              <div className="flex-1 overflow-y-auto sm:pt-4">
+              {/* Core responsive customer component.
+                  data-app-scroll marks the real scroll container: the window does not
+                  scroll here, so overlays need this element to size and freeze against. */}
+              <div data-app-scroll className="flex-1 overflow-y-auto sm:pt-4">
                 <CustomerMenu onGoToAdmin={() => {
                   try {
                     window.history.pushState({}, '', '/admin');
