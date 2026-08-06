@@ -24,11 +24,36 @@ export default function PromoCarousel({ onSelectCategory }: PromoCarouselProps) 
   const [index, setIndex] = useState(0);
   // Slugs whose wide artwork failed both the bundled path and the CDN copy.
   const [noArtwork, setNoArtwork] = useState<string[]>([]);
+  // Admin-managed cards. Null until the fetch settles, so the bundled set shows first
+  // and the card never flashes empty; an empty array means the admin cleared them all
+  // and we fall back to the bundled banners rather than showing nothing.
+  const [managed, setManaged] = useState<PromoBanner[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/promos')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((rows: any[]) => {
+        if (cancelled || !Array.isArray(rows) || rows.length === 0) return;
+        setManaged(rows.map((r) => ({
+          slug: r.id,
+          label: r.label || '',
+          category: r.category || '',
+          image: r.image,
+          // Admin uploads are already absolute Supabase URLs, so there is nothing
+          // further to fall back to.
+          imageFallback: r.image,
+        })));
+      })
+      .catch(() => { /* keep the bundled banners */ });
+    return () => { cancelled = true; };
+  }, []);
   // Set while the customer is interacting; cleared RESUME_AFTER_MS after they stop.
   const [suspended, setSuspended] = useState(false);
   const resumeTimer = useRef<number | null>(null);
 
-  const count = PROMO_BANNERS.length;
+  const banners = managed && managed.length > 0 ? managed : PROMO_BANNERS;
+  const count = banners.length;
 
   const scrollToIndex = useCallback((i: number, smooth = true) => {
     const rail = railRef.current;
@@ -96,9 +121,12 @@ export default function PromoCarousel({ onSelectCategory }: PromoCarouselProps) 
       <button
         key={banner.slug}
         type="button"
-        onClick={() => onSelectCategory(banner.category)}
-        aria-label={`Browse ${banner.label}`}
-        className="relative shrink-0 snap-center w-[268px] aspect-[3/2] rounded-2xl overflow-hidden ring-1 ring-line bg-paper-2 cursor-pointer transition-transform duration-200 active:scale-[0.98] hover:ring-accent/40"
+        // An admin card may be a pure announcement with no category behind it.
+        onClick={() => { if (banner.category) onSelectCategory(banner.category); }}
+        aria-label={banner.category ? `Browse ${banner.label}` : banner.label}
+        className={`relative shrink-0 snap-center w-[268px] aspect-[3/2] rounded-2xl overflow-hidden ring-1 ring-line bg-paper-2 transition-transform duration-200 ${
+          banner.category ? 'cursor-pointer active:scale-[0.98] hover:ring-accent/40' : 'cursor-default'
+        }`}
       >
         <img
           src={usingFallback ? (category?.image ?? banner.image) : banner.image}
@@ -157,13 +185,13 @@ export default function PromoCarousel({ onSelectCategory }: PromoCarouselProps) 
         className="overflow-x-auto scrollbar-none snap-x snap-mandatory"
       >
         <div className="flex gap-3 px-5 w-max">
-          {PROMO_BANNERS.map(renderTile)}
+          {banners.map(renderTile)}
         </div>
       </div>
 
       {/* Position dots double as jump targets */}
       <div className="flex items-center justify-center gap-1.5 py-3.5">
-        {PROMO_BANNERS.map((b, i) => (
+        {banners.map((b, i) => (
           <button
             key={b.slug}
             type="button"

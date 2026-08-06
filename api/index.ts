@@ -305,6 +305,87 @@ const app = express();
     }
   }
 
+  // --- Iconic Range promo cards (admin-managed showcase on the customer menu) ---
+  interface Promo {
+    id: string;
+    label: string;
+    labelAr: string;
+    image: string;
+    /** Menu category a tap filters to. Empty means the card is display-only. */
+    category: string;
+    isActive: boolean;
+    sortOrder: number;
+  }
+
+  const PROMOS_FILE = path.join(process.cwd(), "promos.json");
+  let promos: Promo[] = [];
+
+  if (fs.existsSync(PROMOS_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(PROMOS_FILE, "utf8"));
+      if (Array.isArray(parsed)) promos = parsed;
+    } catch (e) {
+      console.error("Failed reading promos.json");
+    }
+  }
+
+  const sortPromos = (list: Promo[]) =>
+    [...list].sort((a, b) => (a.sortOrder - b.sortOrder) || a.id.localeCompare(b.id));
+
+  async function getPromosFromSupabase(): Promise<Promo[]> {
+    if (supabase) {
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Supabase promos query timed out")), 6000)
+        );
+        const queryPromise = (async () => {
+          const { data, error } = await supabase.from("promos").select("*").order("sort_order");
+          if (error) throw error;
+          return data;
+        })();
+        const data = await Promise.race([queryPromise, timeoutPromise]);
+        if (data) {
+          promos = data.map((d: any) => ({
+            id: d.id,
+            label: d.label || "",
+            labelAr: d.label_ar || "",
+            image: d.image || "",
+            category: d.category || "",
+            isActive: d.is_active !== false,
+            sortOrder: Number(d.sort_order || 0)
+          }));
+          safeWriteFileSync(PROMOS_FILE, JSON.stringify(promos, null, 2));
+          return sortPromos(promos);
+        }
+      } catch (err: any) {
+        console.error("Failed querying promos from Supabase, using local file:", err.message);
+      }
+    }
+    return sortPromos(promos);
+  }
+
+  async function syncPromoToSupabase(p: Promo) {
+    if (supabase) {
+      const { error } = await supabase.from("promos").upsert({
+        id: p.id,
+        label: p.label,
+        label_ar: p.labelAr,
+        image: p.image,
+        category: p.category,
+        is_active: p.isActive,
+        sort_order: p.sortOrder
+      });
+      if (error) throw new Error(`Promos table synchronization error: ${error.message}`);
+    }
+  }
+
+  async function deletePromoFromSupabase(id: string) {
+    if (supabase) {
+      const { error } = await supabase.from("promos").delete().eq("id", id);
+      if (error) throw new Error(`Promos table delete error: ${error.message}`);
+    }
+  }
+
   // --- Loyalty selected products settings ---
   const LOYALTY_SETTINGS_FILE = path.join(process.cwd(), "loyalty_settings.json");
   let loyaltySettings = {
@@ -1374,6 +1455,87 @@ const app = express();
       res.send(csvContent);
     } catch (error: any) {
       res.status(500).send("Error generating export data");
+    }
+  });
+
+  // --- Iconic Range promo cards ---
+
+  // Customers get only the live cards; the admin screen passes ?all=1 for the rest.
+  app.get("/api/promos", async (req, res) => {
+    const list = await getPromosFromSupabase();
+    res.json(req.query.all === "1" ? list : list.filter(p => p.isActive));
+  });
+
+  app.post("/api/promos", async (req, res) => {
+    try {
+      const { label, labelAr, image, category, isActive, sortOrder } = req.body;
+      if (!image) {
+        return res.status(400).json({ error: "A promo card needs an image." });
+      }
+
+      const current = await getPromosFromSupabase();
+      const newPromo: Promo = {
+        id: `promo-${Date.now()}`,
+        label: String(label || "").trim(),
+        labelAr: String(labelAr || "").trim(),
+        image,
+        category: String(category || "").trim(),
+        isActive: isActive !== false,
+        // New cards land at the end unless a position is given.
+        sortOrder: sortOrder !== undefined
+          ? Number(sortOrder)
+          : current.reduce((max, p) => Math.max(max, p.sortOrder), 0) + 10
+      };
+
+      promos = [...current, newPromo];
+      safeWriteFileSync(PROMOS_FILE, JSON.stringify(promos, null, 2));
+      await syncPromoToSupabase(newPromo);
+      res.status(201).json(newPromo);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/promos/:id", async (req, res) => {
+    try {
+      const current = await getPromosFromSupabase();
+      const idx = current.findIndex(p => p.id === req.params.id);
+      if (idx === -1) return res.status(404).json({ error: "Promo card not found" });
+
+      const { label, labelAr, image, category, isActive, sortOrder } = req.body;
+      const updated: Promo = {
+        ...current[idx],
+        label: label !== undefined ? String(label).trim() : current[idx].label,
+        labelAr: labelAr !== undefined ? String(labelAr).trim() : current[idx].labelAr,
+        image: image !== undefined ? image : current[idx].image,
+        category: category !== undefined ? String(category).trim() : current[idx].category,
+        isActive: isActive !== undefined ? !!isActive : current[idx].isActive,
+        sortOrder: sortOrder !== undefined ? Number(sortOrder) : current[idx].sortOrder
+      };
+
+      current[idx] = updated;
+      promos = current;
+      safeWriteFileSync(PROMOS_FILE, JSON.stringify(promos, null, 2));
+      await syncPromoToSupabase(updated);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/promos/:id", async (req, res) => {
+    try {
+      const current = await getPromosFromSupabase();
+      const idx = current.findIndex(p => p.id === req.params.id);
+      if (idx === -1) return res.status(404).json({ error: "Promo card not found" });
+
+      current.splice(idx, 1);
+      promos = current;
+      safeWriteFileSync(PROMOS_FILE, JSON.stringify(promos, null, 2));
+      await deletePromoFromSupabase(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 

@@ -69,6 +69,10 @@
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes ic-slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes ic-shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-4px); }
@@ -81,12 +85,14 @@
 
 .animate-fadeIn { animation: ic-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-slideUp { animation: ic-slide-up 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slideDown { animation: ic-slide-down 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-shake { animation: ic-shake 0.4s ease-in-out both; }
 .animate-livedot { animation: ic-pulse-dot 1.8s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fadeIn,
   .animate-slideUp,
+  .animate-slideDown,
   .animate-shake,
   .animate-livedot {
     animation: none !important;

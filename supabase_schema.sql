@@ -110,3 +110,18 @@ CREATE POLICY "Public read menu-assets" ON storage.objects FOR SELECT USING (buc
 
 DROP POLICY IF EXISTS "Anon upload menu-assets" ON storage.objects;
 CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'menu-assets');
+
+-- 5. Create 'promos' table (admin-managed Iconic Range cards)
+CREATE TABLE IF NOT EXISTS promos (
+  id TEXT PRIMARY KEY,
+  label TEXT,
+  label_ar TEXT,
+  image TEXT,
+  category TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.promos DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for anonymous users on promos" ON public.promos;
+CREATE POLICY "Allow all for anonymous users on promos" ON public.promos FOR ALL USING (true) WITH CHECK (true);

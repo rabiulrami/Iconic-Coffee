@@ -578,22 +578,12 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
     );
   };
 
-  // The quick menu is taller than a short window can show. Cap it to the room left
-  // below the button so its own scrollbar appears, instead of the overflow being
-  // unreachable. Measured rather than set in vh: on desktop the menu lives inside a
-  // fixed-height phone frame, so viewport units would overshoot and get clipped.
+  // Close the drawer on Escape, the expected way out of a full-screen overlay.
   useEffect(() => {
     if (!isQuickMenuOpen) return;
-    const fit = () => {
-      const panel = quickMenuRef.current;
-      const scroller = document.querySelector<HTMLElement>('[data-app-scroll]');
-      if (!panel || !scroller) return;
-      const room = scroller.getBoundingClientRect().bottom - panel.getBoundingClientRect().top - 12;
-      panel.style.maxHeight = `${Math.max(180, room)}px`;
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsQuickMenuOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [isQuickMenuOpen]);
 
   // Freeze the page while an overlay is up, so a swipe moves the overlay rather than
@@ -660,143 +650,19 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
           <Shield className="w-[18px] h-[18px]" strokeWidth={1.6} />
         </button>
 
-        {/* Quick-route menu: jump anywhere without scrolling the whole page */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2">
-          <button
-            type="button"
-            onClick={() => setIsQuickMenuOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={isQuickMenuOpen}
-            aria-label="Menu"
-            className={`p-2 rounded-full active:scale-95 transition-all cursor-pointer ${
-              isQuickMenuOpen ? 'text-accent bg-paper-2' : 'text-faint hover:text-accent hover:bg-paper-2'
-            }`}
-          >
-            <Menu className="w-[18px] h-[18px]" strokeWidth={1.8} />
-          </button>
-
-          {isQuickMenuOpen && (
-            <>
-              {/* Click-away catcher sits under the panel but over the page */}
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setIsQuickMenuOpen(false)}
-              />
-              {/* Dark panel: text-only, high contrast against the ivory page behind it */}
-              <div
-                ref={quickMenuRef}
-                role="menu"
-                // overscroll-contain stops a swipe that reaches the end of this list
-                // from continuing into the page underneath.
-                className="absolute left-0 top-[calc(100%+8px)] z-50 w-60 bg-espresso border border-white/10 rounded-2xl shadow-lift overflow-y-auto overscroll-contain scrollbar-none animate-fadeIn"
-              >
-                <div className="px-4 pt-3.5 pb-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-cream-muted font-sans font-bold">Go to</p>
-                </div>
-
-                {activeOrderId && activeOrder && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => { setIsQuickMenuOpen(false); setIsTrackingOpen(true); }}
-                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
-                  >
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent animate-livedot shrink-0" />
-                    <span className="text-[14px] font-semibold text-cream">Track my order</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => { setIsQuickMenuOpen(false); scrollToSection(searchRef); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
-                >
-                  <Search className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
-                  <span className="text-[14px] font-semibold text-cream">Search the menu</span>
-                </button>
-
-                <div className="border-y border-white/10 my-1 py-1">
-                  {CATEGORIES.map((cat) => {
-                    const active = activeCategory === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => { setIsQuickMenuOpen(false); handleSelectCategory(cat.id); }}
-                        className={`w-full pl-4 pr-4 py-2 flex items-center justify-between gap-2 text-left transition cursor-pointer border-l-2 ${
-                          active
-                            ? 'bg-white/10 border-accent'
-                            : 'border-transparent hover:bg-white/10 hover:border-accent/50'
-                        }`}
-                      >
-                        <span className={`text-[14px] ${active ? 'text-cream font-bold' : 'text-cream/90 font-semibold'}`}>
-                          {cat.nameEn}
-                        </span>
-                        <span className="text-[12px] text-cream-muted font-serif font-bold shrink-0" dir="rtl">
-                          {cat.nameAr}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => { setIsQuickMenuOpen(false); scrollToSection(loyaltyRef); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
-                >
-                  <Award className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
-                  <span className="text-[14px] font-semibold text-cream">Loyalty & rewards</span>
-                </button>
-
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => { setIsQuickMenuOpen(false); setIsAboutOpen(true); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
-                >
-                  <Info className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
-                  <span className="text-[14px] font-semibold text-cream">About us</span>
-                </button>
-
-                <a
-                  role="menuitem"
-                  href="tel:+966500000000"
-                  onClick={() => setIsQuickMenuOpen(false)}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
-                >
-                  <PhoneCall className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
-                  <span className="text-[14px] font-semibold text-cream">Call the shop</span>
-                </a>
-
-                <div className="border-t border-white/10 mt-1 pt-1 pb-1">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => { setIsQuickMenuOpen(false); scrollToSection(topRef); }}
-                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
-                  >
-                    <ArrowUp className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
-                    <span className="text-[14px] font-semibold text-cream">Back to top</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => { setIsQuickMenuOpen(false); onGoToAdmin(); }}
-                    className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
-                  >
-                    <Shield className="w-4 h-4 text-cream-muted shrink-0" strokeWidth={2} />
-                    <span className="text-[14px] font-semibold text-cream-muted">Staff portal</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {/* Opens the top drawer below */}
+        <button
+          type="button"
+          onClick={() => setIsQuickMenuOpen(true)}
+          aria-haspopup="menu"
+          aria-expanded={isQuickMenuOpen}
+          aria-label="Menu"
+          className={`absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full active:scale-95 transition-all cursor-pointer ${
+            isQuickMenuOpen ? 'text-accent bg-paper-2' : 'text-faint hover:text-accent hover:bg-paper-2'
+          }`}
+        >
+          <Menu className="w-[18px] h-[18px]" strokeWidth={1.8} />
+        </button>
 
         {/* Monogram emblem */}
         <div className="w-12 h-12 rounded-full border border-accent/30 flex items-center justify-center bg-paper">
@@ -1781,6 +1647,139 @@ export default function CustomerMenu({ onGoToAdmin }: CustomerMenuProps) {
                   {isCheckoutLoading ? "Placing your order…" : "Place order"}
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- QUICK-ROUTE DRAWER: drops from the very top over a blurred page --- */}
+      {isQuickMenuOpen && (
+        <div className="fixed inset-0 z-[60] flex flex-col items-center">
+          {/* Backdrop: the whole page behind is blurred out, tap anywhere to close */}
+          <div
+            className="absolute inset-0 bg-espresso/45 backdrop-blur-xl"
+            onClick={() => setIsQuickMenuOpen(false)}
+          />
+
+          <div
+            ref={quickMenuRef}
+            role="menu"
+            // overscroll-contain stops a swipe that reaches the end of the list from
+            // continuing into the page underneath.
+            className="relative w-full max-w-md bg-espresso/97 border-b border-white/10 rounded-b-3xl shadow-lift max-h-[88dvh] overflow-y-auto overscroll-contain scrollbar-none animate-slideDown"
+          >
+            <div className="sticky top-0 bg-espresso/97 backdrop-blur-sm px-4 pt-4 pb-2 flex items-center justify-between border-b border-white/8">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-cream-muted font-sans font-bold">Go to</p>
+              <button
+                type="button"
+                onClick={() => setIsQuickMenuOpen(false)}
+                aria-label="Close menu"
+                className="p-1.5 -mr-1.5 rounded-full text-cream-muted hover:text-cream hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" strokeWidth={1.8} />
+              </button>
+            </div>
+
+            <div className="pt-1.5" />
+
+            {activeOrderId && activeOrder && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { setIsQuickMenuOpen(false); setIsTrackingOpen(true); }}
+                className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+              >
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent animate-livedot shrink-0" />
+                <span className="text-[14px] font-semibold text-cream">Track my order</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { setIsQuickMenuOpen(false); scrollToSection(searchRef); }}
+              className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+            >
+              <Search className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+              <span className="text-[14px] font-semibold text-cream">Search the menu</span>
+            </button>
+
+            <div className="border-y border-white/10 my-1 py-1">
+              {CATEGORIES.map((cat) => {
+                const active = activeCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setIsQuickMenuOpen(false); handleSelectCategory(cat.id); }}
+                    className={`w-full pl-4 pr-4 py-2 flex items-center justify-between gap-2 text-left transition cursor-pointer border-l-2 ${
+                      active
+                        ? 'bg-white/10 border-accent'
+                        : 'border-transparent hover:bg-white/10 hover:border-accent/50'
+                    }`}
+                  >
+                    <span className={`text-[14px] ${active ? 'text-cream font-bold' : 'text-cream/90 font-semibold'}`}>
+                      {cat.nameEn}
+                    </span>
+                    <span className="text-[12px] text-cream-muted font-serif font-bold shrink-0" dir="rtl">
+                      {cat.nameAr}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { setIsQuickMenuOpen(false); scrollToSection(loyaltyRef); }}
+              className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+            >
+              <Award className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+              <span className="text-[14px] font-semibold text-cream">Loyalty & rewards</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { setIsQuickMenuOpen(false); setIsAboutOpen(true); }}
+              className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+            >
+              <Info className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+              <span className="text-[14px] font-semibold text-cream">About us</span>
+            </button>
+
+            <a
+              role="menuitem"
+              href="tel:+966500000000"
+              onClick={() => setIsQuickMenuOpen(false)}
+              className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+            >
+              <PhoneCall className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+              <span className="text-[14px] font-semibold text-cream">Call the shop</span>
+            </a>
+
+            <div className="border-t border-white/10 mt-1 pt-1 pb-1">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { setIsQuickMenuOpen(false); scrollToSection(topRef); }}
+                className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+              >
+                <ArrowUp className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />
+                <span className="text-[14px] font-semibold text-cream">Back to top</span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { setIsQuickMenuOpen(false); onGoToAdmin(); }}
+                className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left hover:bg-white/10 transition cursor-pointer"
+              >
+                <Shield className="w-4 h-4 text-cream-muted shrink-0" strokeWidth={2} />
+                <span className="text-[14px] font-semibold text-cream-muted">Staff portal</span>
+              </button>
             </div>
           </div>
         </div>

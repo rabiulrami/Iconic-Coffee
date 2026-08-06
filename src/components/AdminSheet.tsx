@@ -27,6 +27,7 @@ import {
   Banknote,
   CreditCard
 } from 'lucide-react';
+import AdminPromos from './AdminPromos';
 
 interface OrderItem {
   id: string;
@@ -255,6 +256,21 @@ CREATE TABLE IF NOT EXISTS loyalty (
   reward_available BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 5. Create 'promos' table (the Iconic Range cards on the customer menu)
+CREATE TABLE IF NOT EXISTS promos (
+  id TEXT PRIMARY KEY,
+  label TEXT,
+  label_ar TEXT,
+  image TEXT,
+  category TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.promos DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for anonymous users on promos" ON public.promos;
+CREATE POLICY "Allow all for anonymous users on promos" ON public.promos FOR ALL USING (true) WITH CHECK (true);
 
 -- Disable Row Level Security (RLS) to allow simple direct inserts and updates
 ALTER TABLE public.products DISABLE ROW LEVEL SECURITY;
@@ -1805,6 +1821,9 @@ CREATE POLICY "Anon upload menu-assets" ON storage.objects FOR INSERT WITH CHECK
                 <PlusCircle className="w-4 h-4" /> Add New Product Item
               </button>
             </div>
+
+            {/* Promo showcase at the top of the customer menu */}
+            <AdminPromos />
 
             {/* Quick Filter Search */}
             <div className="bg-slate-900 p-3 border border-slate-800 rounded-xl relative">
